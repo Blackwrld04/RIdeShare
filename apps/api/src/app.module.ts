@@ -4,6 +4,7 @@ import { BankModule } from "./bank/bank.module.js";
 import { BookingModule } from "./bookings/booking.module.js";
 import { DriverModule } from "./driver/driver.module.js";
 import { HealthController } from "./health.controller.js";
+import { IdentityModule } from "./identity/identity.module.js";
 import { InfrastructureModule } from "./infrastructure/infrastructure.module.js";
 import { PaymentModule } from "./payments/payment.module.js";
 import { ProfileModule } from "./profiles/profile.module.js";
@@ -15,6 +16,7 @@ import { UploadModule } from "./uploads/upload.module.js";
   imports: [
     InfrastructureModule,
     AuthModule,
+    IdentityModule,
     BankModule,
     PaymentModule,
     BookingModule,
