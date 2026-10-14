@@ -191,6 +191,8 @@ model User {
   ledgerJournals       LedgerJournal[]
   identityVerification UserIdentityVerification?
   notifications        UserNotification[]
+  chatMessages         ChatMessage[]             @relation("ChatMessageSender")
+  chatReadReceipts     ChatReadReceipt[]
 
   @@map("users")
 }
@@ -488,6 +490,8 @@ model RideBooking {
   payments              PaymentTransaction[]
   refunds               PaymentRefund[]
   ledgerJournals        LedgerJournal[]
+  chatMessages          ChatMessage[]
+  chatReadReceipts      ChatReadReceipt[]
 
   @@index([rideOfferId, status], map: "ride_bookings_offer_status_idx")
   @@index([passengerUserId, createdAt(sort: Desc)], map: "ride_bookings_passenger_created_idx")
@@ -644,4 +648,36 @@ model UserNotification {
 
   @@index([userId, readAt, createdAt(sort: Desc)], map: "user_notifications_user_read_created_idx")
   @@map("user_notifications")
+}
+
+model ChatMessage {
+  id              String            @id @default(uuid()) @db.Uuid
+  bookingId       String            @map("booking_id") @db.Uuid
+  senderUserId    String            @map("sender_user_id") @db.Uuid
+  clientMessageId String            @map("client_message_id") @db.Uuid
+  kind            String            @default("text") @db.VarChar(32)
+  body            String            @db.VarChar(1000)
+  metadata        Json?
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  booking         RideBooking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  sender          User              @relation("ChatMessageSender", fields: [senderUserId], references: [id], onDelete: Restrict)
+  readReceipts    ChatReadReceipt[] @relation("ChatReadMessage")
+
+  @@unique([senderUserId, clientMessageId], map: "chat_messages_sender_client_key")
+  @@index([bookingId, createdAt(sort: Desc), id(sort: Desc)], map: "chat_messages_booking_created_idx")
+  @@map("chat_messages")
+}
+
+model ChatReadReceipt {
+  bookingId         String      @map("booking_id") @db.Uuid
+  userId            String      @map("user_id") @db.Uuid
+  lastReadMessageId String      @map("last_read_message_id") @db.Uuid
+  readThroughAt     DateTime    @map("read_through_at") @db.Timestamptz(3)
+  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  booking           RideBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadMessage   ChatMessage @relation("ChatReadMessage", fields: [lastReadMessageId], references: [id], onDelete: Cascade)
+
+  @@id([bookingId, userId])
+  @@map("chat_read_receipts")
 }
