@@ -1,4 +1,9 @@
-import { BookingStatus, Prisma, RideStatus } from "@commuteshare/database";
+import {
+  BookingStatus,
+  Prisma,
+  RefundKind,
+  RideStatus,
+} from "@commuteshare/database";
 import {
   BadRequestException,
   ConflictException,
@@ -8,6 +13,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { DatabaseService } from "../infrastructure/database.service.js";
+import { PaymentService } from "../payments/payment.service.js";
 import {
   ACTIVE_BOOKING_STATUSES,
   calculateAvailableSeats,
@@ -101,6 +107,7 @@ export interface BookingResponse {
 export class BookingService {
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(PaymentService) private readonly payments: PaymentService,
   ) {}
 
   async create(
@@ -298,6 +305,12 @@ export class BookingService {
 
       await this.reopenRideIfSeatsAvailable(transaction, booking.rideOfferId);
     });
+
+    await this.payments.refundBooking(
+      bookingId,
+      RefundKind.PASSENGER_CANCELLATION,
+      input.reason,
+    );
 
     return this.getBooking(bookingId);
   }

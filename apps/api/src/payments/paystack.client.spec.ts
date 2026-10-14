@@ -84,4 +84,43 @@ describe("HttpPaystackClient", () => {
       currency: "NGN",
     });
   });
+
+  it("queues a partial refund in kobo", async () => {
+    const fetchImplementation = vi.fn().mockResolvedValue(
+      Response.json({
+        status: true,
+        message: "Refund has been queued for processing",
+        data: {
+          id: 3_018_284,
+          status: "pending",
+          amount: 130_000,
+          currency: "NGN",
+        },
+      }),
+    );
+    const client = new HttpPaystackClient(
+      config,
+      fetchImplementation as typeof fetch,
+    );
+
+    await expect(
+      client.createRefund({
+        transactionReference: "CS-reference",
+        amountKobo: 130_000,
+        currency: "NGN",
+        reason: "Passenger cancelled within 24 hours",
+      }),
+    ).resolves.toMatchObject({
+      id: "3018284",
+      status: "pending",
+      amountKobo: 130_000,
+    });
+
+    const [url, request] = fetchImplementation.mock.calls[0] ?? [];
+    expect(String(url)).toBe("https://api.paystack.co/refund");
+    expect(JSON.parse(String(request?.body))).toMatchObject({
+      transaction: "CS-reference",
+      amount: 130_000,
+    });
+  });
 });

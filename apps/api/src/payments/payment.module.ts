@@ -2,6 +2,7 @@ import type { AppConfig } from "@commuteshare/config";
 import { Module, type Provider } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module.js";
 import { APP_CONFIG } from "../config.provider.js";
+import { LedgerService } from "./ledger.service.js";
 import { PaymentController } from "./payment.controller.js";
 import { PaymentService } from "./payment.service.js";
 import { HttpPaystackClient, PaystackClient } from "./paystack.client.js";
@@ -16,7 +17,7 @@ const paystackClientProvider: Provider<PaystackClient> = {
 @Module({
   imports: [AuthModule],
   controllers: [PaymentController, PaystackWebhookController],
-  providers: [paystackClientProvider, PaymentService],
-  exports: [PaystackClient, PaymentService],
+  providers: [paystackClientProvider, LedgerService, PaymentService],
+  exports: [LedgerService, PaystackClient, PaymentService],
 })
 export class PaymentModule {}
