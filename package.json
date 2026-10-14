@@ -1,0 +1,40 @@
+{
+  "name": "commuteshare-backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "overrides": {
+    "deepmerge-ts": "8.0.2",
+    "mysql2": "3.24.6"
+  },
+  "scripts": {
+    "build": "npm run build:packages && npm run build --workspace @commuteshare/api && npm run build --workspace @commuteshare/worker",
+    "build:packages": "npm run build --workspace @commuteshare/config && npm run build --workspace @commuteshare/database",
+    "db:deploy": "npm run db:deploy --workspace @commuteshare/database",
+    "db:migrate": "npm run db:migrate --workspace @commuteshare/database",
+    "dev:api": "npm run build:packages && npm run dev --workspace @commuteshare/api",
+    "dev:worker": "npm run build:packages && npm run dev --workspace @commuteshare/worker",
+    "format": "biome format --write .",
+    "lint": "biome check .",
+    "prisma:generate": "npm run prisma:generate --workspace @commuteshare/database",
+    "test": "npm run build:packages && npm run test --workspaces --if-present",
+    "test:coverage": "npm run build:packages && npm run test:coverage --workspaces --if-present",
+    "typecheck": "npm run build:packages && npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@types/node": "^22.20.5",
+    "@vitest/coverage-v8": "^5.0.4",
+    "prisma": "^7.10.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.4"
+  }
+}
