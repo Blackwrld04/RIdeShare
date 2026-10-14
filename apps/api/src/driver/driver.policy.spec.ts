@@ -15,6 +15,7 @@ function completeSnapshot(): DriverSubmissionSnapshot {
     city: "Lagos",
     state: "Lagos",
     vehicle: { id: "vehicle-id" },
+    bankAccountStatus: "VERIFIED",
     documents: REQUIRED_DRIVER_DOCUMENT_KINDS.map((kind) => ({
       kind,
       status: "PENDING",
@@ -42,6 +43,7 @@ describe("driver submission policy", () => {
   it("reports missing, rejected, and expired requirements", () => {
     const snapshot = completeSnapshot();
     snapshot.profileDisplayName = null;
+    snapshot.bankAccountStatus = null;
     snapshot.documents = snapshot.documents.filter(
       (document) => document.kind !== "government_id",
     );
@@ -61,6 +63,7 @@ describe("driver submission policy", () => {
     ).toEqual(
       expect.arrayContaining([
         "profile.display_name",
+        "bank_account",
         "documents.government_id",
         "documents.driver_license.rejected",
         "documents.driver_license.expired",

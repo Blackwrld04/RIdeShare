@@ -5,6 +5,7 @@ export interface RidePublishSnapshot {
   departureAt: Date;
   passengerSeats: number;
   driverStatus: string;
+  bankAccountStatus: string | null;
   vehicleSeatCapacity: number | null;
   routePoints: Array<{ kind: string }>;
 }
@@ -44,6 +45,10 @@ export function getRidePublishIssues(
 
   if (ride.driverStatus !== "APPROVED") {
     issues.push("driver.approval");
+  }
+
+  if (ride.bankAccountStatus !== "VERIFIED") {
+    issues.push("driver.bank_account");
   }
 
   if (ride.vehicleSeatCapacity === null) {

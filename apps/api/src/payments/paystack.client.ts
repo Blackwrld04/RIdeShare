@@ -35,6 +35,40 @@ const refundResponseSchema = z.object({
   }),
 });
 
+const banksResponseSchema = z.object({
+  status: z.literal(true),
+  data: z.array(
+    z.object({
+      name: z.string().min(1),
+      code: z.string().min(1),
+      currency: z.string().length(3),
+      active: z.boolean(),
+    }),
+  ),
+});
+
+const accountResolutionResponseSchema = z.object({
+  status: z.literal(true),
+  data: z.object({
+    account_number: z.string().regex(/^\d{10}$/),
+    account_name: z.string().min(1),
+  }),
+});
+
+const transferRecipientResponseSchema = z.object({
+  status: z.literal(true),
+  data: z.object({
+    recipient_code: z.string().min(1),
+    name: z.string().min(1),
+    details: z.object({
+      account_number: z.string().min(4),
+      account_name: z.string().min(1),
+      bank_code: z.string().min(1),
+      bank_name: z.string().min(1),
+    }),
+  }),
+});
+
 export interface InitializePaystackTransactionInput {
   email: string;
   amountKobo: number;
@@ -74,6 +108,25 @@ export interface CreatedPaystackRefund {
   message: string;
 }
 
+export interface PaystackBank {
+  name: string;
+  code: string;
+  currency: string;
+}
+
+export interface ResolvedPaystackAccount {
+  accountNumber: string;
+  accountName: string;
+}
+
+export interface CreatedTransferRecipient {
+  recipientCode: string;
+  accountNumber: string;
+  accountName: string;
+  bankCode: string;
+  bankName: string;
+}
+
 export abstract class PaystackClient {
   abstract initialize(
     input: InitializePaystackTransactionInput,
@@ -82,6 +135,18 @@ export abstract class PaystackClient {
   abstract createRefund(
     input: CreatePaystackRefundInput,
   ): Promise<CreatedPaystackRefund>;
+  abstract listBanks(): Promise<PaystackBank[]>;
+  abstract resolveAccount(
+    accountNumber: string,
+    bankCode: string,
+  ): Promise<ResolvedPaystackAccount>;
+  abstract createTransferRecipient(input: {
+    name: string;
+    accountNumber: string;
+    bankCode: string;
+    currency: string;
+    description: string;
+  }): Promise<CreatedTransferRecipient>;
 }
 
 export class HttpPaystackClient extends PaystackClient {
@@ -154,6 +219,69 @@ export class HttpPaystackClient extends PaystackClient {
       amountKobo: parsed.data.amount,
       currency: parsed.data.currency,
       message: parsed.message,
+    };
+  }
+
+  async listBanks(): Promise<PaystackBank[]> {
+    const response = await this.request("/bank?country=nigeria&currency=NGN", {
+      method: "GET",
+    });
+    const parsed = banksResponseSchema.parse(response);
+
+    return parsed.data
+      .filter((bank) => bank.active && bank.currency === "NGN")
+      .map((bank) => ({
+        name: bank.name,
+        code: bank.code,
+        currency: bank.currency,
+      }));
+  }
+
+  async resolveAccount(
+    accountNumber: string,
+    bankCode: string,
+  ): Promise<ResolvedPaystackAccount> {
+    const query = new URLSearchParams({
+      account_number: accountNumber,
+      bank_code: bankCode,
+    });
+    const response = await this.request(`/bank/resolve?${query.toString()}`, {
+      method: "GET",
+    });
+    const parsed = accountResolutionResponseSchema.parse(response);
+
+    return {
+      accountNumber: parsed.data.account_number,
+      accountName: parsed.data.account_name,
+    };
+  }
+
+  async createTransferRecipient(input: {
+    name: string;
+    accountNumber: string;
+    bankCode: string;
+    currency: string;
+    description: string;
+  }): Promise<CreatedTransferRecipient> {
+    const response = await this.request("/transferrecipient", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "nuban",
+        name: input.name,
+        account_number: input.accountNumber,
+        bank_code: input.bankCode,
+        currency: input.currency,
+        description: input.description,
+      }),
+    });
+    const parsed = transferRecipientResponseSchema.parse(response);
+
+    return {
+      recipientCode: parsed.data.recipient_code,
+      accountNumber: parsed.data.details.account_number,
+      accountName: parsed.data.details.account_name,
+      bankCode: parsed.data.details.bank_code,
+      bankName: parsed.data.details.bank_name,
     };
   }
 

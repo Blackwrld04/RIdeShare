@@ -41,6 +41,7 @@ const rideInclude = {
     select: {
       status: true,
       userId: true,
+      bankAccount: { select: { status: true } },
       user: { select: { profile: { select: { displayName: true } } } },
       vehicle: {
         select: {
@@ -373,6 +374,8 @@ export class RideService {
         departureAt: current.departureAt,
         passengerSeats: current.passengerSeats,
         driverStatus: current.driverApplication.status,
+        bankAccountStatus:
+          current.driverApplication.bankAccount?.status ?? null,
         vehicleSeatCapacity:
           current.driverApplication.vehicle?.seatCapacity ?? null,
         routePoints: current.routePoints,

@@ -123,4 +123,84 @@ describe("HttpPaystackClient", () => {
       amount: 130_000,
     });
   });
+
+  it("lists active Nigerian banks", async () => {
+    const fetchImplementation = vi.fn().mockResolvedValue(
+      Response.json({
+        status: true,
+        data: [
+          { name: "GTBank", code: "058", currency: "NGN", active: true },
+          { name: "Old Bank", code: "999", currency: "NGN", active: false },
+        ],
+      }),
+    );
+    const client = new HttpPaystackClient(
+      config,
+      fetchImplementation as typeof fetch,
+    );
+
+    await expect(client.listBanks()).resolves.toEqual([
+      { name: "GTBank", code: "058", currency: "NGN" },
+    ]);
+    expect(String(fetchImplementation.mock.calls[0]?.[0])).toContain(
+      "/bank?country=nigeria&currency=NGN",
+    );
+  });
+
+  it("resolves a NUBAN account", async () => {
+    const fetchImplementation = vi.fn().mockResolvedValue(
+      Response.json({
+        status: true,
+        data: {
+          account_number: "0123456789",
+          account_name: "OLAJIDE ABDULQUADRI",
+        },
+      }),
+    );
+    const client = new HttpPaystackClient(
+      config,
+      fetchImplementation as typeof fetch,
+    );
+
+    await expect(client.resolveAccount("0123456789", "058")).resolves.toEqual({
+      accountNumber: "0123456789",
+      accountName: "OLAJIDE ABDULQUADRI",
+    });
+  });
+
+  it("creates a sandbox transfer recipient", async () => {
+    const fetchImplementation = vi.fn().mockResolvedValue(
+      Response.json({
+        status: true,
+        data: {
+          recipient_code: "RCP_testrecipient",
+          name: "OLAJIDE ABDULQUADRI",
+          details: {
+            account_number: "0123456789",
+            account_name: "OLAJIDE ABDULQUADRI",
+            bank_code: "058",
+            bank_name: "GTBank",
+          },
+        },
+      }),
+    );
+    const client = new HttpPaystackClient(
+      config,
+      fetchImplementation as typeof fetch,
+    );
+
+    await expect(
+      client.createTransferRecipient({
+        name: "OLAJIDE ABDULQUADRI",
+        accountNumber: "0123456789",
+        bankCode: "058",
+        currency: "NGN",
+        description: "CommuteShare driver payout",
+      }),
+    ).resolves.toMatchObject({
+      recipientCode: "RCP_testrecipient",
+      bankCode: "058",
+      bankName: "GTBank",
+    });
+  });
 });
