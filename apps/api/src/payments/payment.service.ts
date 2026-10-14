@@ -17,7 +17,10 @@ import {
 import { APP_CONFIG } from "../config.provider.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
 import { calculatePlatformFeeKobo } from "./payment.policy.js";
-import type { InitializeCheckoutInput } from "./payment.schemas.js";
+import type {
+  InitializeCheckoutInput,
+  PaystackWebhook,
+} from "./payment.schemas.js";
 import { PaystackClient } from "./paystack.client.js";
 
 const paymentInclude = {
@@ -139,6 +142,108 @@ export class PaymentService {
 
   async get(userId: string, paymentId: string): Promise<PaymentResponse> {
     return this.getOwned(userId, paymentId);
+  }
+
+  async handlePaystackWebhook(event: PaystackWebhook): Promise<void> {
+    if (event.event !== "charge.success") {
+      return;
+    }
+
+    const payment = await this.database.client.paymentTransaction.findUnique({
+      where: { reference: event.data.reference },
+      select: {
+        id: true,
+        reference: true,
+        amountKobo: true,
+        currency: true,
+        booking: { select: { rideOfferId: true } },
+      },
+    });
+
+    if (!payment) {
+      return;
+    }
+
+    const verified = await this.paystack.verify(payment.reference);
+
+    if (verified.status !== "success") {
+      return;
+    }
+    if (
+      verified.reference !== payment.reference ||
+      BigInt(verified.amountKobo) !== payment.amountKobo ||
+      verified.currency !== payment.currency
+    ) {
+      throw new BadRequestException(
+        "Paystack verification did not match payment",
+      );
+    }
+
+    await this.database.client.$transaction(async (transaction) => {
+      await transaction.$queryRaw(
+        Prisma.sql`SELECT id FROM ride_offers WHERE id = ${payment.booking.rideOfferId} FOR UPDATE`,
+      );
+      const current = await transaction.paymentTransaction.findUnique({
+        where: { id: payment.id },
+        include: {
+          booking: {
+            select: {
+              status: true,
+              rideOffer: { select: { status: true, departureAt: true } },
+            },
+          },
+        },
+      });
+
+      if (!current) {
+        return;
+      }
+      if (
+        current.status === PaymentStatus.SUCCEEDED ||
+        current.status === PaymentStatus.REFUND_PENDING ||
+        current.status === PaymentStatus.REFUNDED
+      ) {
+        return;
+      }
+
+      const paidAt = verified.paidAt ?? new Date();
+      const canConfirm =
+        current.booking.status === BookingStatus.AWAITING_PAYMENT &&
+        (current.booking.rideOffer.status === RideStatus.PUBLISHED ||
+          current.booking.rideOffer.status === RideStatus.FULL) &&
+        current.booking.rideOffer.departureAt > paidAt;
+
+      await transaction.paymentTransaction.update({
+        where: { id: current.id },
+        data: {
+          status: canConfirm
+            ? PaymentStatus.SUCCEEDED
+            : PaymentStatus.REFUND_PENDING,
+          providerTransactionId: verified.id,
+          providerMessage: "Verified charge.success",
+          paidAt,
+          ...(canConfirm ? {} : { refundRequiredAt: new Date() }),
+        },
+      });
+
+      if (canConfirm) {
+        const confirmed = await transaction.rideBooking.updateMany({
+          where: {
+            id: current.bookingId,
+            status: BookingStatus.AWAITING_PAYMENT,
+          },
+          data: {
+            status: BookingStatus.CONFIRMED,
+            decidedAt: paidAt,
+            decisionReason: "Payment verified",
+          },
+        });
+
+        if (confirmed.count !== 1) {
+          throw new ConflictException("Booking payment state changed");
+        }
+      }
+    });
   }
 
   private async reservePaymentAttempt(
