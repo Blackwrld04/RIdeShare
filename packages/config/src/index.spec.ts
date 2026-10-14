@@ -9,6 +9,7 @@ const requiredEnvironment = {
   AUTH_REFRESH_TOKEN_SECRET: "c".repeat(32),
   OTP_HMAC_SECRET: "b".repeat(32),
   OTP_DEV_CODE: "000000",
+  PAYSTACK_SECRET_KEY: "sk_test_commuteshare_local",
   STORAGE_BUCKET: "commuteshare-private",
   STORAGE_ACCESS_KEY_ID: "commuteshare",
   STORAGE_SECRET_ACCESS_KEY: "commuteshare-local-secret",
@@ -37,6 +38,10 @@ describe("loadConfig", () => {
       SMS_PROVIDER: "console",
       TERMII_BASE_URL: "https://api.ng.termii.com",
       TERMII_SENDER_ID: "CommuteNG",
+      PAYSTACK_BASE_URL: "https://api.paystack.co",
+      PAYSTACK_SECRET_KEY: requiredEnvironment.PAYSTACK_SECRET_KEY,
+      PAYSTACK_CALLBACK_URL: "http://localhost:3000/payments/callback",
+      PLATFORM_FEE_BASIS_POINTS: 1_500,
       STORAGE_REGION: "us-east-1",
       STORAGE_BUCKET: "commuteshare-private",
       STORAGE_ACCESS_KEY_ID: "commuteshare",
@@ -78,5 +83,14 @@ describe("loadConfig", () => {
 
     expect(config.STORAGE_FORCE_PATH_STYLE).toBe(true);
     expect(config.UPLOAD_MAX_BYTES).toBe(2_097_152);
+  });
+
+  it("rejects live Paystack keys while sandbox mode is enforced", () => {
+    expect(() =>
+      loadConfig({
+        ...requiredEnvironment,
+        PAYSTACK_SECRET_KEY: "sk_live_commuteshare_local",
+      }),
+    ).toThrow("PAYSTACK_SECRET_KEY");
   });
 });

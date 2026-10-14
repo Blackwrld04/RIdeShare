@@ -58,6 +58,18 @@ const environmentSchema = z
       z.string().min(1).optional(),
     ),
     TERMII_SENDER_ID: z.string().min(3).max(11).default("CommuteNG"),
+    PAYSTACK_BASE_URL: z.string().url().default("https://api.paystack.co"),
+    PAYSTACK_SECRET_KEY: z.string().min(16).startsWith("sk_test_"),
+    PAYSTACK_CALLBACK_URL: z
+      .string()
+      .url()
+      .default("http://localhost:3000/payments/callback"),
+    PLATFORM_FEE_BASIS_POINTS: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(5_000)
+      .default(1_500),
     STORAGE_ENDPOINT: z.preprocess(
       (value) => (value === "" ? undefined : value),
       z.string().url().optional(),
