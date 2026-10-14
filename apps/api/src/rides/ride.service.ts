@@ -1,4 +1,5 @@
 import {
+  BookingStatus,
   DriverApplicationStatus,
   Prisma,
   RideStatus,
@@ -11,6 +12,10 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import {
+  ACTIVE_BOOKING_STATUSES,
+  calculateAvailableSeats,
+} from "../bookings/booking.policy.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
 import {
   buildRoutePoints,
@@ -26,6 +31,10 @@ import type {
 
 const rideInclude = {
   routePoints: { orderBy: { sequence: "asc" } },
+  bookings: {
+    where: { status: { in: [...ACTIVE_BOOKING_STATUSES] } },
+    select: { seats: true, status: true },
+  },
   driverApplication: {
     select: {
       status: true,
@@ -63,6 +72,7 @@ export interface RideOfferResponse {
   departureAt: string;
   timezone: string;
   passengerSeats: number;
+  availableSeats: number;
   contributionKobo: number;
   currency: string;
   notes: string | null;
@@ -203,10 +213,23 @@ export class RideService {
           INNER JOIN ride_route_points AS destination
             ON destination.ride_offer_id = ride.id
             AND destination.kind = 'DESTINATION'::ride_point_kind
+          LEFT JOIN (
+            SELECT ride_offer_id, SUM(seats) AS reserved_seats
+            FROM ride_bookings
+            WHERE status IN (
+              'PENDING'::booking_status,
+              'CONFIRMED'::booking_status
+            )
+            GROUP BY ride_offer_id
+          ) AS reservations
+            ON reservations.ride_offer_id = ride.id
           WHERE ride.status = 'PUBLISHED'::ride_status
             AND ride.departure_at >= ${departureFrom}
             AND ride.departure_at <= ${departureTo}
-            AND ride.passenger_seats >= ${input.seats}
+            AND ride.passenger_seats - COALESCE(
+              reservations.reserved_seats,
+              0
+            ) >= ${input.seats}
             AND ST_DWithin(
               origin.location,
               ST_SetSRID(
@@ -366,23 +389,40 @@ export class RideService {
     input: CancelRideInput,
   ): Promise<RideOfferResponse> {
     const ride = await this.requireOwnedRide(userId, rideId);
-    const cancelled = await this.database.client.rideOffer.updateMany({
-      where: {
-        id: ride.id,
-        status: {
-          in: [RideStatus.DRAFT, RideStatus.PUBLISHED, RideStatus.FULL],
+    await this.database.client.$transaction(async (transaction) => {
+      await this.lockRide(transaction, ride.id);
+      const cancelledAt = new Date();
+      const cancelled = await transaction.rideOffer.updateMany({
+        where: {
+          id: ride.id,
+          driverApplication: { userId },
+          status: {
+            in: [RideStatus.DRAFT, RideStatus.PUBLISHED, RideStatus.FULL],
+          },
         },
-      },
-      data: {
-        status: RideStatus.CANCELLED,
-        cancelledAt: new Date(),
-        cancellationReason: input.reason,
-      },
-    });
+        data: {
+          status: RideStatus.CANCELLED,
+          cancelledAt,
+          cancellationReason: input.reason,
+        },
+      });
 
-    if (cancelled.count !== 1) {
-      throw new ConflictException("Ride offer cannot be cancelled");
-    }
+      if (cancelled.count !== 1) {
+        throw new ConflictException("Ride offer cannot be cancelled");
+      }
+
+      await transaction.rideBooking.updateMany({
+        where: {
+          rideOfferId: ride.id,
+          status: { in: [...ACTIVE_BOOKING_STATUSES] },
+        },
+        data: {
+          status: BookingStatus.CANCELLED,
+          cancelledAt,
+          cancellationReason: input.reason,
+        },
+      });
+    });
 
     return this.get(userId, rideId);
   }
@@ -432,6 +472,15 @@ export class RideService {
     if (claimed.count !== 1) {
       throw new ConflictException("Ride offer is no longer editable");
     }
+  }
+
+  private async lockRide(
+    transaction: Prisma.TransactionClient,
+    rideId: string,
+  ): Promise<void> {
+    await transaction.$queryRaw(
+      Prisma.sql`SELECT id FROM ride_offers WHERE id = ${rideId} FOR UPDATE`,
+    );
   }
 
   private assertDraft(status: RideStatus): void {
@@ -508,6 +557,10 @@ export class RideService {
       departureAt: ride.departureAt.toISOString(),
       timezone: ride.timezone,
       passengerSeats: ride.passengerSeats,
+      availableSeats: calculateAvailableSeats(
+        ride.passengerSeats,
+        ride.bookings,
+      ),
       contributionKobo: Number(ride.contributionKobo),
       currency: ride.currency,
       notes: ride.notes,
