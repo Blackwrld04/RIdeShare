@@ -17,6 +17,7 @@ import {
   calculateAvailableSeats,
 } from "../bookings/booking.policy.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
+import { canCompleteRide, canStartRide } from "../trips/trip.policy.js";
 import {
   buildRoutePoints,
   getRidePublishIssues,
@@ -88,6 +89,8 @@ export interface RideOfferResponse {
     externalId: string | null;
   }>;
   publishedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
   cancelledAt: string | null;
   cancellationReason: string | null;
   createdAt: string;
@@ -137,9 +140,15 @@ export class RideService {
     return this.toResponse(ride);
   }
 
-  async getMine(userId: string): Promise<RideOfferResponse[]> {
+  async getMine(
+    userId: string,
+    statuses?: RideStatus[],
+  ): Promise<RideOfferResponse[]> {
     const rides = await this.database.client.rideOffer.findMany({
-      where: { driverApplication: { userId } },
+      where: {
+        driverApplication: { userId },
+        ...(statuses ? { status: { in: statuses } } : {}),
+      },
       include: rideInclude,
       orderBy: { departureAt: "desc" },
       take: 50,
@@ -427,6 +436,87 @@ export class RideService {
     return this.get(userId, rideId);
   }
 
+  async start(userId: string, rideId: string): Promise<RideOfferResponse> {
+    const ride = await this.requireOwnedRide(userId, rideId);
+
+    if (!canStartRide(ride.status)) {
+      throw new ConflictException("Ride cannot be started");
+    }
+
+    await this.database.client.$transaction(async (transaction) => {
+      await this.lockRide(transaction, ride.id);
+      const startedAt = new Date();
+      const started = await transaction.rideOffer.updateMany({
+        where: {
+          id: ride.id,
+          driverApplication: { userId },
+          status: { in: [RideStatus.PUBLISHED, RideStatus.FULL] },
+        },
+        data: { status: RideStatus.IN_PROGRESS, startedAt },
+      });
+
+      if (started.count !== 1) {
+        throw new ConflictException("Ride cannot be started");
+      }
+
+      await transaction.rideBooking.updateMany({
+        where: {
+          rideOfferId: ride.id,
+          status: BookingStatus.PENDING,
+        },
+        data: {
+          status: BookingStatus.EXPIRED,
+          decidedAt: startedAt,
+          decisionReason: "Ride started before confirmation",
+        },
+      });
+      await transaction.rideBooking.updateMany({
+        where: {
+          rideOfferId: ride.id,
+          status: BookingStatus.CONFIRMED,
+        },
+        data: { status: BookingStatus.IN_PROGRESS, startedAt },
+      });
+    });
+
+    return this.get(userId, rideId);
+  }
+
+  async complete(userId: string, rideId: string): Promise<RideOfferResponse> {
+    const ride = await this.requireOwnedRide(userId, rideId);
+
+    if (!canCompleteRide(ride.status)) {
+      throw new ConflictException("Ride cannot be completed");
+    }
+
+    await this.database.client.$transaction(async (transaction) => {
+      await this.lockRide(transaction, ride.id);
+      const completedAt = new Date();
+      const completed = await transaction.rideOffer.updateMany({
+        where: {
+          id: ride.id,
+          driverApplication: { userId },
+          status: RideStatus.IN_PROGRESS,
+        },
+        data: { status: RideStatus.COMPLETED, completedAt },
+      });
+
+      if (completed.count !== 1) {
+        throw new ConflictException("Ride cannot be completed");
+      }
+
+      await transaction.rideBooking.updateMany({
+        where: {
+          rideOfferId: ride.id,
+          status: BookingStatus.IN_PROGRESS,
+        },
+        data: { status: BookingStatus.COMPLETED, completedAt },
+      });
+    });
+
+    return this.get(userId, rideId);
+  }
+
   private async requireApprovedDriver(userId: string) {
     const driver = await this.database.client.driverApplication.findUnique({
       where: { userId },
@@ -557,10 +647,12 @@ export class RideService {
       departureAt: ride.departureAt.toISOString(),
       timezone: ride.timezone,
       passengerSeats: ride.passengerSeats,
-      availableSeats: calculateAvailableSeats(
-        ride.passengerSeats,
-        ride.bookings,
-      ),
+      availableSeats:
+        ride.status === RideStatus.IN_PROGRESS ||
+        ride.status === RideStatus.COMPLETED ||
+        ride.status === RideStatus.CANCELLED
+          ? 0
+          : calculateAvailableSeats(ride.passengerSeats, ride.bookings),
       contributionKobo: Number(ride.contributionKobo),
       currency: ride.currency,
       notes: ride.notes,
@@ -576,6 +668,8 @@ export class RideService {
         externalId: point.externalId,
       })),
       publishedAt: ride.publishedAt?.toISOString() ?? null,
+      startedAt: ride.startedAt?.toISOString() ?? null,
+      completedAt: ride.completedAt?.toISOString() ?? null,
       cancelledAt: ride.cancelledAt?.toISOString() ?? null,
       cancellationReason: ride.cancellationReason,
       createdAt: ride.createdAt.toISOString(),

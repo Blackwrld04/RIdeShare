@@ -28,6 +28,8 @@ const bookingInclude = {
       status: true,
       departureAt: true,
       timezone: true,
+      startedAt: true,
+      completedAt: true,
       routePoints: { orderBy: { sequence: "asc" } },
       driverApplication: {
         select: {
@@ -74,6 +76,8 @@ export interface BookingResponse {
     } | null;
     departureAt: string;
     timezone: string;
+    startedAt: string | null;
+    completedAt: string | null;
     route: Array<{
       sequence: number;
       kind: string;
@@ -85,6 +89,8 @@ export interface BookingResponse {
   };
   decidedAt: string | null;
   decisionReason: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
   cancelledAt: string | null;
   cancellationReason: string | null;
   createdAt: string;
@@ -206,9 +212,15 @@ export class BookingService {
     return this.getBooking(bookingId);
   }
 
-  async getMine(userId: string): Promise<BookingResponse[]> {
+  async getMine(
+    userId: string,
+    statuses?: BookingStatus[],
+  ): Promise<BookingResponse[]> {
     const bookings = await this.database.client.rideBooking.findMany({
-      where: { passengerUserId: userId },
+      where: {
+        passengerUserId: userId,
+        ...(statuses ? { status: { in: statuses } } : {}),
+      },
       include: bookingInclude,
       orderBy: { createdAt: "desc" },
       take: 100,
@@ -415,6 +427,8 @@ export class BookingService {
           : null,
         departureAt: booking.rideOffer.departureAt.toISOString(),
         timezone: booking.rideOffer.timezone,
+        startedAt: booking.rideOffer.startedAt?.toISOString() ?? null,
+        completedAt: booking.rideOffer.completedAt?.toISOString() ?? null,
         route: booking.rideOffer.routePoints.map((point) => ({
           sequence: point.sequence,
           kind: point.kind,
@@ -426,6 +440,8 @@ export class BookingService {
       },
       decidedAt: booking.decidedAt?.toISOString() ?? null,
       decisionReason: booking.decisionReason,
+      startedAt: booking.startedAt?.toISOString() ?? null,
+      completedAt: booking.completedAt?.toISOString() ?? null,
       cancelledAt: booking.cancelledAt?.toISOString() ?? null,
       cancellationReason: booking.cancellationReason,
       createdAt: booking.createdAt.toISOString(),
