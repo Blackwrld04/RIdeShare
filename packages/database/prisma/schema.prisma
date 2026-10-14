@@ -45,6 +45,25 @@ enum UploadStatus {
   @@map("upload_status")
 }
 
+enum RideStatus {
+  DRAFT
+  PUBLISHED
+  FULL
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+
+  @@map("ride_status")
+}
+
+enum RidePointKind {
+  ORIGIN
+  WAYPOINT
+  DESTINATION
+
+  @@map("ride_point_kind")
+}
+
 model User {
   id                String             @id @default(uuid()) @db.Uuid
   phoneE164         String             @unique @map("phone_e164") @db.VarChar(16)
@@ -119,6 +138,7 @@ model DriverApplication {
   user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   vehicle            DriverVehicle?
   documents          DriverDocument[]
+  rides              RideOffer[]
 
   @@index([status, submittedAt], map: "driver_applications_status_submitted_idx")
   @@map("driver_applications")
@@ -182,4 +202,47 @@ model UploadAsset {
   @@index([ownerUserId, status], map: "upload_assets_owner_status_idx")
   @@index([status, uploadExpiresAt], map: "upload_assets_status_expiry_idx")
   @@map("upload_assets")
+}
+
+model RideOffer {
+  id                  String            @id @default(uuid()) @db.Uuid
+  driverApplicationId String            @map("driver_application_id") @db.Uuid
+  status              RideStatus        @default(DRAFT)
+  departureAt         DateTime          @map("departure_at") @db.Timestamptz(3)
+  timezone            String            @default("Africa/Lagos") @db.VarChar(64)
+  passengerSeats      Int               @map("passenger_seats") @db.SmallInt
+  contributionKobo    BigInt            @map("contribution_kobo")
+  currency            String            @default("NGN") @db.Char(3)
+  notes               String?           @db.VarChar(280)
+  publishedAt         DateTime?         @map("published_at") @db.Timestamptz(3)
+  cancelledAt         DateTime?         @map("cancelled_at") @db.Timestamptz(3)
+  cancellationReason  String?           @map("cancellation_reason") @db.VarChar(280)
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  driverApplication   DriverApplication @relation(fields: [driverApplicationId], references: [id], onDelete: Cascade)
+  routePoints         RideRoutePoint[]
+
+  @@index([driverApplicationId, departureAt(sort: Desc)], map: "ride_offers_driver_departure_idx")
+  @@index([status, departureAt], map: "ride_offers_status_departure_idx")
+  @@map("ride_offers")
+}
+
+model RideRoutePoint {
+  id             String                                @id @default(uuid()) @db.Uuid
+  rideOfferId    String                                @map("ride_offer_id") @db.Uuid
+  sequence       Int                                   @db.SmallInt
+  kind           RidePointKind
+  label          String                                @db.VarChar(120)
+  address        String?                               @db.VarChar(200)
+  latitude       Decimal                               @db.Decimal(9, 6)
+  longitude      Decimal                               @db.Decimal(9, 6)
+  externalSource String?                               @map("external_source") @db.VarChar(32)
+  externalId     String?                               @map("external_id") @db.VarChar(128)
+  location       Unsupported("geography(Point,4326)")?
+  createdAt      DateTime                              @default(now()) @map("created_at") @db.Timestamptz(3)
+  rideOffer      RideOffer                             @relation(fields: [rideOfferId], references: [id], onDelete: Cascade)
+
+  @@unique([rideOfferId, sequence], map: "ride_route_points_offer_sequence_key")
+  @@index([rideOfferId, kind], map: "ride_route_points_offer_kind_idx")
+  @@map("ride_route_points")
 }
