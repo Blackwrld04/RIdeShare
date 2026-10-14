@@ -13,6 +13,7 @@ const environmentSchema = z
       .enum(["fatal", "error", "warn", "info", "debug"])
       .default("info"),
     AUTH_ACCESS_TOKEN_SECRET: z.string().min(32),
+    AUTH_REFRESH_TOKEN_SECRET: z.string().min(32),
     AUTH_ACCESS_TOKEN_TTL_SECONDS: z.coerce
       .number()
       .int()
@@ -52,7 +53,10 @@ const environmentSchema = z
       .optional(),
     SMS_PROVIDER: z.enum(["console", "termii"]).default("console"),
     TERMII_BASE_URL: z.string().url().default("https://api.ng.termii.com"),
-    TERMII_API_KEY: z.string().min(1).optional(),
+    TERMII_API_KEY: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.string().min(1).optional(),
+    ),
     TERMII_SENDER_ID: z.string().min(3).max(11).default("CommuteNG"),
   })
   .superRefine((config, context) => {
@@ -61,6 +65,14 @@ const environmentSchema = z
         code: "custom",
         path: ["TERMII_API_KEY"],
         message: "TERMII_API_KEY is required when SMS_PROVIDER is termii",
+      });
+    }
+
+    if (config.SMS_PROVIDER === "console" && !config.OTP_DEV_CODE) {
+      context.addIssue({
+        code: "custom",
+        path: ["OTP_DEV_CODE"],
+        message: "OTP_DEV_CODE is required when SMS_PROVIDER is console",
       });
     }
 
