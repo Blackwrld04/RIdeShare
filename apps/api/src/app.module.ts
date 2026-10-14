@@ -4,6 +4,7 @@ import { BookingModule } from "./bookings/booking.module.js";
 import { DriverModule } from "./driver/driver.module.js";
 import { HealthController } from "./health.controller.js";
 import { InfrastructureModule } from "./infrastructure/infrastructure.module.js";
+import { PaymentModule } from "./payments/payment.module.js";
 import { ProfileModule } from "./profiles/profile.module.js";
 import { RideModule } from "./rides/ride.module.js";
 import { TripModule } from "./trips/trip.module.js";
@@ -13,6 +14,7 @@ import { UploadModule } from "./uploads/upload.module.js";
   imports: [
     InfrastructureModule,
     AuthModule,
+    PaymentModule,
     BookingModule,
     ProfileModule,
     DriverModule,
