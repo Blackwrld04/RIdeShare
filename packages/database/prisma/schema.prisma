@@ -35,6 +35,16 @@ enum DriverDocumentStatus {
   @@map("driver_document_status")
 }
 
+enum UploadStatus {
+  PENDING
+  READY
+  EXPIRED
+  QUARANTINED
+  DELETED
+
+  @@map("upload_status")
+}
+
 model User {
   id                String             @id @default(uuid()) @db.Uuid
   phoneE164         String             @unique @map("phone_e164") @db.VarChar(16)
@@ -45,6 +55,7 @@ model User {
   profile           UserProfile?
   sessions          AuthSession[]
   driverApplication DriverApplication?
+  uploads           UploadAsset[]
 
   @@map("users")
 }
@@ -132,6 +143,7 @@ model DriverVehicle {
 model DriverDocument {
   id                  String               @id @default(uuid()) @db.Uuid
   driverApplicationId String               @map("driver_application_id") @db.Uuid
+  assetId             String?              @unique @map("asset_id") @db.Uuid
   kind                String               @db.VarChar(64)
   storageKey          String               @map("storage_key") @db.VarChar(512)
   contentType         String               @map("content_type") @db.VarChar(100)
@@ -144,8 +156,30 @@ model DriverDocument {
   createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
   application         DriverApplication    @relation(fields: [driverApplicationId], references: [id], onDelete: Cascade)
+  asset               UploadAsset?         @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
   @@unique([driverApplicationId, kind], map: "driver_documents_application_kind_key")
   @@index([status], map: "driver_documents_status_idx")
   @@map("driver_documents")
+}
+
+model UploadAsset {
+  id              String          @id @default(uuid()) @db.Uuid
+  ownerUserId     String          @map("owner_user_id") @db.Uuid
+  purpose         String          @db.VarChar(64)
+  objectKey       String          @unique @map("object_key") @db.VarChar(512)
+  contentType     String          @map("content_type") @db.VarChar(100)
+  sizeBytes       BigInt          @map("size_bytes")
+  checksumSha256  String          @map("checksum_sha256") @db.Char(64)
+  status          UploadStatus    @default(PENDING)
+  uploadExpiresAt DateTime        @map("upload_expires_at") @db.Timestamptz(3)
+  completedAt     DateTime?       @map("completed_at") @db.Timestamptz(3)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  owner           User            @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  driverDocument  DriverDocument?
+
+  @@index([ownerUserId, status], map: "upload_assets_owner_status_idx")
+  @@index([status, uploadExpiresAt], map: "upload_assets_status_expiry_idx")
+  @@map("upload_assets")
 }
