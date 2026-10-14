@@ -98,6 +98,12 @@ const environmentSchema = z
       .min(0)
       .max(5_000)
       .default(1_500),
+    MIN_SEGMENT_CONTRIBUTION_KOBO: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(10_000_000)
+      .default(50_000),
     PAYOUT_DELAY_HOURS: z.coerce.number().int().min(1).max(168).default(24),
     PAYOUT_RECONCILIATION_SECONDS: z.coerce
       .number()
