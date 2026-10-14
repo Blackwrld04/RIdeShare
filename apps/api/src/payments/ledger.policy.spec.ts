@@ -4,6 +4,8 @@ import {
   assertBalancedJournal,
   calculateRefund,
   escrowFundedEntries,
+  payoutReversedEntries,
+  payoutSettledEntries,
   refundReservedEntries,
   refundSettledEntries,
   tripSettledEntries,
@@ -13,6 +15,8 @@ describe("ledger policy", () => {
   it.each(
     [
       escrowFundedEntries(230_000n),
+      payoutSettledEntries(200_000n),
+      payoutReversedEntries(200_000n),
       refundReservedEntries(230_000n, 130_000n, 100_000n),
       refundSettledEntries(130_000n),
       tripSettledEntries(200_000n, 30_000n),

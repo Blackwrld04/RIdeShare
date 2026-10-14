@@ -5,6 +5,7 @@ import { APP_CONFIG } from "../config.provider.js";
 import { LedgerService } from "./ledger.service.js";
 import { PaymentController } from "./payment.controller.js";
 import { PaymentService } from "./payment.service.js";
+import { PayoutQueueService } from "./payout-queue.service.js";
 import { HttpPaystackClient, PaystackClient } from "./paystack.client.js";
 import { PaystackWebhookController } from "./paystack-webhook.controller.js";
 
@@ -17,7 +18,12 @@ const paystackClientProvider: Provider<PaystackClient> = {
 @Module({
   imports: [AuthModule],
   controllers: [PaymentController, PaystackWebhookController],
-  providers: [paystackClientProvider, LedgerService, PaymentService],
+  providers: [
+    paystackClientProvider,
+    LedgerService,
+    PayoutQueueService,
+    PaymentService,
+  ],
   exports: [LedgerService, PaystackClient, PaymentService],
 })
 export class PaymentModule {}

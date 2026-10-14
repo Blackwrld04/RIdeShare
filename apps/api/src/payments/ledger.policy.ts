@@ -119,6 +119,36 @@ export function tripSettledEntries(
   ];
 }
 
+export function payoutSettledEntries(amountKobo: bigint): JournalEntryInput[] {
+  return [
+    {
+      account: LedgerAccount.DRIVER_PAYABLE,
+      direction: LedgerDirection.DEBIT,
+      amountKobo,
+    },
+    {
+      account: LedgerAccount.PLATFORM_CASH,
+      direction: LedgerDirection.CREDIT,
+      amountKobo,
+    },
+  ];
+}
+
+export function payoutReversedEntries(amountKobo: bigint): JournalEntryInput[] {
+  return [
+    {
+      account: LedgerAccount.PLATFORM_CASH,
+      direction: LedgerDirection.DEBIT,
+      amountKobo,
+    },
+    {
+      account: LedgerAccount.DRIVER_PAYABLE,
+      direction: LedgerDirection.CREDIT,
+      amountKobo,
+    },
+  ];
+}
+
 export function calculateRefund(
   kind: RefundKindValue,
   baseAmountKobo: bigint,

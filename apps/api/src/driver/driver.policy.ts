@@ -23,6 +23,7 @@ export interface DriverSubmissionSnapshot {
   city: string | null;
   state: string | null;
   vehicle: { id: string } | null;
+  bankAccountStatus: string | null;
   documents: Array<{
     kind: string;
     status: string;
@@ -57,6 +58,10 @@ export function getDriverSubmissionIssues(
 
   if (!snapshot.vehicle) {
     issues.push("vehicle");
+  }
+
+  if (snapshot.bankAccountStatus !== "VERIFIED") {
+    issues.push("bank_account");
   }
 
   const documents = new Map(

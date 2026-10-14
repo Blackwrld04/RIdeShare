@@ -23,6 +23,7 @@ import {
 import {
   type PaymentResponse,
   PaymentService,
+  type PayoutResponse,
   type RefundResponse,
 } from "./payment.service.js";
 
@@ -48,6 +49,11 @@ export class PaymentController {
     @Req() request: AuthenticatedRequest,
   ): Promise<LedgerJournalResponse[]> {
     return this.ledger.getMine(request.auth.userId);
+  }
+
+  @Get("payouts/mine")
+  getPayouts(@Req() request: AuthenticatedRequest): Promise<PayoutResponse[]> {
+    return this.payments.getPayouts(request.auth.userId);
   }
 
   @Get("refunds/:refundId")

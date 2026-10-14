@@ -24,6 +24,7 @@ describe("ride policy", () => {
           departureAt: new Date("2026-10-14T12:30:00.000Z"),
           passengerSeats: 3,
           driverStatus: DriverApplicationStatus.APPROVED,
+          bankAccountStatus: "VERIFIED",
           vehicleSeatCapacity: 5,
           routePoints: [
             { kind: RidePointKind.ORIGIN },
@@ -42,6 +43,7 @@ describe("ride policy", () => {
           departureAt: new Date("2026-10-14T12:10:00.000Z"),
           passengerSeats: 4,
           driverStatus: DriverApplicationStatus.SUSPENDED,
+          bankAccountStatus: null,
           vehicleSeatCapacity: 4,
           routePoints: [],
         },
@@ -49,6 +51,7 @@ describe("ride policy", () => {
       ),
     ).toEqual([
       "driver.approval",
+      "driver.bank_account",
       "ride.passenger_seats",
       "ride.departure_at",
       "route.origin",

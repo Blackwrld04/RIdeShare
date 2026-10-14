@@ -3,6 +3,7 @@ import { Pool } from "pg";
 import { PrismaClient } from "./generated/prisma/client.js";
 
 export {
+  BankAccountStatus,
   BookingStatus,
   DriverApplicationStatus,
   DriverDocumentStatus,
@@ -11,6 +12,7 @@ export {
   LedgerJournalKind,
   PaymentProvider,
   PaymentStatus,
+  PayoutStatus,
   Prisma,
   PrismaClient,
   RefundKind,

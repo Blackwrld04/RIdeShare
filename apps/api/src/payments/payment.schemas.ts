@@ -19,6 +19,7 @@ export const paystackWebhookSchema = z
           .optional(),
         currency: z.string().length(3).optional(),
         status: z.string().optional(),
+        transfer_code: z.string().min(1).optional(),
       })
       .passthrough(),
   })

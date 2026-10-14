@@ -25,6 +25,7 @@ import type {
 const applicationInclude = {
   user: { select: { profile: { select: { displayName: true } } } },
   vehicle: true,
+  bankAccount: true,
   documents: { orderBy: { kind: "asc" } },
 } satisfies Prisma.DriverApplicationInclude;
 
@@ -53,6 +54,13 @@ export interface DriverApplicationResponse {
     year: number;
     registrationNumber: string;
     seatCapacity: number;
+  } | null;
+  bankAccount: {
+    status: string;
+    bankCode: string;
+    bankName: string;
+    accountName: string;
+    maskedAccountNumber: string;
   } | null;
   documents: Array<{
     id: string;
@@ -322,6 +330,7 @@ export class DriverService {
       city: application.city,
       state: application.state,
       vehicle: application.vehicle,
+      bankAccountStatus: application.bankAccount?.status ?? null,
       documents: application.documents,
     });
   }
@@ -354,6 +363,15 @@ export class DriverService {
             year: application.vehicle.year,
             registrationNumber: application.vehicle.registrationNumber,
             seatCapacity: application.vehicle.seatCapacity,
+          }
+        : null,
+      bankAccount: application.bankAccount
+        ? {
+            status: application.bankAccount.status,
+            bankCode: application.bankAccount.bankCode,
+            bankName: application.bankAccount.bankName,
+            accountName: application.bankAccount.accountName,
+            maskedAccountNumber: `******${application.bankAccount.accountNumberLast4}`,
           }
         : null,
       documents: application.documents.map((document) => ({

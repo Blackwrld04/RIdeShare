@@ -42,6 +42,8 @@ describe("loadConfig", () => {
       PAYSTACK_SECRET_KEY: requiredEnvironment.PAYSTACK_SECRET_KEY,
       PAYSTACK_CALLBACK_URL: "http://localhost:3000/payments/callback",
       PLATFORM_FEE_BASIS_POINTS: 1_500,
+      PAYOUT_DELAY_HOURS: 24,
+      PAYOUT_RECONCILIATION_SECONDS: 60,
       STORAGE_REGION: "us-east-1",
       STORAGE_BUCKET: "commuteshare-private",
       STORAGE_ACCESS_KEY_ID: "commuteshare",
