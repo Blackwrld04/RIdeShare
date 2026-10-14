@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+const identityEncryptionKeySchema = z.string().refine((value) => {
+  try {
+    return Buffer.from(value, "base64").length === 32;
+  } catch {
+    return false;
+  }
+}, "IDENTITY_ENCRYPTION_KEY must be a base64-encoded 32-byte key");
+
 export const PAYOUT_QUEUE_NAME = "driver-payouts";
 export const PROCESS_PAYOUT_JOB = "process-payout";
 export const RECONCILE_PAYOUTS_JOB = "reconcile-payouts";
@@ -55,6 +63,22 @@ const environmentSchema = z
       .string()
       .regex(/^\d{6}$/)
       .optional(),
+    NIN_PROVIDER: z.literal("ninja").default("ninja"),
+    NINJA_BASE_URL: z
+      .string()
+      .url()
+      .default("https://api.sandbox.ninja.boucloud.io"),
+    NINJA_CLIENT_KEY: z.string().min(1),
+    NINJA_CLIENT_SECRET: z.string().min(1),
+    NIN_CONSENT_VERSION: z.string().min(1).max(32).default("2026-10-01"),
+    NIN_RETRY_COOLDOWN_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(10)
+      .max(3_600)
+      .default(60),
+    IDENTITY_ENCRYPTION_KEY: identityEncryptionKeySchema,
+    IDENTITY_HMAC_SECRET: z.string().min(32),
     SMS_PROVIDER: z.enum(["console", "termii"]).default("console"),
     TERMII_BASE_URL: z.string().url().default("https://api.ng.termii.com"),
     TERMII_API_KEY: z.preprocess(
@@ -136,6 +160,17 @@ const environmentSchema = z
         code: "custom",
         path: ["OTP_DEV_CODE"],
         message: "OTP_DEV_CODE cannot be set in production",
+      });
+    }
+
+    if (
+      config.NODE_ENV === "production" &&
+      new URL(config.NINJA_BASE_URL).hostname.includes("sandbox")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["NINJA_BASE_URL"],
+        message: "Production requires the live Ninja API",
       });
     }
   });
