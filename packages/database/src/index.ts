@@ -7,6 +7,7 @@ export {
   BookingStatus,
   DriverApplicationStatus,
   DriverDocumentStatus,
+  IdentityVerificationStatus,
   LedgerAccount,
   LedgerDirection,
   LedgerJournalKind,

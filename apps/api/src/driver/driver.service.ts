@@ -23,7 +23,21 @@ import type {
 } from "./driver.schemas.js";
 
 const applicationInclude = {
-  user: { select: { profile: { select: { displayName: true } } } },
+  user: {
+    select: {
+      profile: { select: { displayName: true } },
+      identityVerification: {
+        select: {
+          status: true,
+          ninLast4: true,
+          legalFirstName: true,
+          legalLastName: true,
+          dateOfBirth: true,
+          verifiedAt: true,
+        },
+      },
+    },
+  },
   vehicle: true,
   bankAccount: true,
   documents: { orderBy: { kind: "asc" } },
@@ -61,6 +75,11 @@ export interface DriverApplicationResponse {
     bankName: string;
     accountName: string;
     maskedAccountNumber: string;
+  } | null;
+  identityVerification: {
+    status: string;
+    maskedNin: string;
+    verifiedAt: string | null;
   } | null;
   documents: Array<{
     id: string;
@@ -331,6 +350,7 @@ export class DriverService {
       state: application.state,
       vehicle: application.vehicle,
       bankAccountStatus: application.bankAccount?.status ?? null,
+      identityVerification: application.user.identityVerification,
       documents: application.documents,
     });
   }
@@ -372,6 +392,15 @@ export class DriverService {
             bankName: application.bankAccount.bankName,
             accountName: application.bankAccount.accountName,
             maskedAccountNumber: `******${application.bankAccount.accountNumberLast4}`,
+          }
+        : null,
+      identityVerification: application.user.identityVerification
+        ? {
+            status: application.user.identityVerification.status,
+            maskedNin: `*******${application.user.identityVerification.ninLast4}`,
+            verifiedAt:
+              application.user.identityVerification.verifiedAt?.toISOString() ??
+              null,
           }
         : null,
       documents: application.documents.map((document) => ({

@@ -160,21 +160,56 @@ enum PayoutStatus {
   @@map("payout_status")
 }
 
+enum IdentityVerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+
+  @@map("identity_verification_status")
+}
+
 model User {
-  id                String             @id @default(uuid()) @db.Uuid
-  phoneE164         String             @unique @map("phone_e164") @db.VarChar(16)
-  phoneVerifiedAt   DateTime           @map("phone_verified_at") @db.Timestamptz(3)
-  status            UserStatus         @default(ACTIVE)
-  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
-  profile           UserProfile?
-  sessions          AuthSession[]
-  driverApplication DriverApplication?
-  uploads           UploadAsset[]
-  rideBookings      RideBooking[]
-  ledgerJournals    LedgerJournal[]
+  id                   String                    @id @default(uuid()) @db.Uuid
+  phoneE164            String                    @unique @map("phone_e164") @db.VarChar(16)
+  phoneVerifiedAt      DateTime                  @map("phone_verified_at") @db.Timestamptz(3)
+  status               UserStatus                @default(ACTIVE)
+  createdAt            DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  profile              UserProfile?
+  sessions             AuthSession[]
+  driverApplication    DriverApplication?
+  uploads              UploadAsset[]
+  rideBookings         RideBooking[]
+  ledgerJournals       LedgerJournal[]
+  identityVerification UserIdentityVerification?
 
   @@map("users")
+}
+
+model UserIdentityVerification {
+  id                String                     @id @default(uuid()) @db.Uuid
+  userId            String                     @unique @map("user_id") @db.Uuid
+  status            IdentityVerificationStatus @default(PENDING)
+  provider          String                     @db.VarChar(32)
+  providerReference String?                    @unique @map("provider_reference") @db.VarChar(100)
+  ninCiphertext     Bytes                      @map("nin_ciphertext") @db.ByteA
+  ninIv             Bytes                      @map("nin_iv") @db.ByteA
+  ninAuthTag        Bytes                      @map("nin_auth_tag") @db.ByteA
+  ninLookupHash     String                     @unique @map("nin_lookup_hash") @db.Char(64)
+  ninLast4          String                     @map("nin_last4") @db.Char(4)
+  legalFirstName    String                     @map("legal_first_name") @db.VarChar(80)
+  legalLastName     String                     @map("legal_last_name") @db.VarChar(80)
+  dateOfBirth       DateTime                   @map("date_of_birth") @db.Date
+  consentVersion    String                     @map("consent_version") @db.VarChar(32)
+  consentedAt       DateTime                   @map("consented_at") @db.Timestamptz(3)
+  failureReason     String?                    @map("failure_reason") @db.VarChar(280)
+  verifiedAt        DateTime?                  @map("verified_at") @db.Timestamptz(3)
+  createdAt         DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt], map: "user_identity_verifications_status_created_idx")
+  @@map("user_identity_verifications")
 }
 
 model UserProfile {

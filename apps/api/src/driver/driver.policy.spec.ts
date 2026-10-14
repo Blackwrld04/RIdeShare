@@ -16,6 +16,12 @@ function completeSnapshot(): DriverSubmissionSnapshot {
     state: "Lagos",
     vehicle: { id: "vehicle-id" },
     bankAccountStatus: "VERIFIED",
+    identityVerification: {
+      status: "VERIFIED",
+      legalFirstName: "Ada",
+      legalLastName: "Okafor",
+      dateOfBirth: new Date("1995-02-10T00:00:00.000Z"),
+    },
     documents: REQUIRED_DRIVER_DOCUMENT_KINDS.map((kind) => ({
       kind,
       status: "PENDING",
@@ -78,5 +84,24 @@ describe("driver submission policy", () => {
     expect(
       getDriverSubmissionIssues(snapshot, new Date("2026-10-14T12:00:00.000Z")),
     ).toContain("application.minimum_age");
+  });
+
+  it("requires verified identity details to match the application", () => {
+    const missing = completeSnapshot();
+    missing.identityVerification = null;
+    const mismatch = completeSnapshot();
+    mismatch.identityVerification = {
+      status: "VERIFIED",
+      legalFirstName: "Another",
+      legalLastName: "Person",
+      dateOfBirth: new Date("1995-02-10T00:00:00.000Z"),
+    };
+
+    expect(getDriverSubmissionIssues(missing)).toContain(
+      "identity_verification",
+    );
+    expect(getDriverSubmissionIssues(mismatch)).toContain(
+      "identity_verification.details_mismatch",
+    );
   });
 });
