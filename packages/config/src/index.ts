@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export const PAYOUT_QUEUE_NAME = "driver-payouts";
+export const PROCESS_PAYOUT_JOB = "process-payout";
+export const RECONCILE_PAYOUTS_JOB = "reconcile-payouts";
+
 const environmentSchema = z
   .object({
     NODE_ENV: z
@@ -70,6 +74,13 @@ const environmentSchema = z
       .min(0)
       .max(5_000)
       .default(1_500),
+    PAYOUT_DELAY_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+    PAYOUT_RECONCILIATION_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(15)
+      .max(3_600)
+      .default(60),
     STORAGE_ENDPOINT: z.preprocess(
       (value) => (value === "" ? undefined : value),
       z.string().url().optional(),

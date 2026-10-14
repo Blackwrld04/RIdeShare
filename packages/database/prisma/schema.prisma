@@ -120,6 +120,7 @@ enum LedgerJournalKind {
   REFUND_SETTLED
   TRIP_SETTLED
   PAYOUT_SETTLED
+  PAYOUT_REVERSED
 
   @@map("ledger_journal_kind")
 }
@@ -139,6 +140,24 @@ enum LedgerDirection {
   CREDIT
 
   @@map("ledger_direction")
+}
+
+enum BankAccountStatus {
+  VERIFIED
+  DISABLED
+
+  @@map("bank_account_status")
+}
+
+enum PayoutStatus {
+  SCHEDULED
+  PROCESSING
+  SUBMITTED
+  SUCCESS
+  FAILED
+  REVERSED
+
+  @@map("payout_status")
 }
 
 model User {
@@ -219,6 +238,8 @@ model DriverApplication {
   vehicle            DriverVehicle?
   documents          DriverDocument[]
   rides              RideOffer[]
+  bankAccount        DriverBankAccount?
+  payouts            DriverPayout[]
 
   @@index([status, submittedAt], map: "driver_applications_status_submitted_idx")
   @@map("driver_applications")
@@ -304,6 +325,7 @@ model RideOffer {
   driverApplication   DriverApplication @relation(fields: [driverApplicationId], references: [id], onDelete: Cascade)
   routePoints         RideRoutePoint[]
   bookings            RideBooking[]
+  payout              DriverPayout?
 
   @@index([driverApplicationId, departureAt(sort: Desc)], map: "ride_offers_driver_departure_idx")
   @@index([status, departureAt], map: "ride_offers_status_departure_idx")
@@ -414,22 +436,71 @@ model PaymentRefund {
 
 model LedgerJournal {
   id             String              @id @default(uuid()) @db.Uuid
-  bookingId      String              @map("booking_id") @db.Uuid
+  bookingId      String?             @map("booking_id") @db.Uuid
   paymentId      String?             @map("payment_id") @db.Uuid
   refundId       String?             @map("refund_id") @db.Uuid
   userId         String?             @map("user_id") @db.Uuid
+  payoutId       String?             @map("payout_id") @db.Uuid
   kind           LedgerJournalKind
   idempotencyKey String              @unique @map("idempotency_key") @db.VarChar(160)
   currency       String              @db.Char(3)
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
-  booking        RideBooking         @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  booking        RideBooking?        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
   payment        PaymentTransaction? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
   refund         PaymentRefund?      @relation(fields: [refundId], references: [id], onDelete: Restrict)
   user           User?               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  payout         DriverPayout?       @relation(fields: [payoutId], references: [id], onDelete: Restrict)
   entries        LedgerEntry[]
 
   @@index([bookingId, createdAt], map: "ledger_journals_booking_created_idx")
   @@map("ledger_journals")
+}
+
+model DriverBankAccount {
+  id                    String            @id @default(uuid()) @db.Uuid
+  driverApplicationId   String            @unique @map("driver_application_id") @db.Uuid
+  status                BankAccountStatus @default(VERIFIED)
+  bankCode              String            @map("bank_code") @db.VarChar(10)
+  bankName              String            @map("bank_name") @db.VarChar(120)
+  accountName           String            @map("account_name") @db.VarChar(120)
+  accountNumberLast4    String            @map("account_number_last4") @db.Char(4)
+  providerRecipientCode String            @unique @map("provider_recipient_code") @db.VarChar(40)
+  resolvedAt            DateTime          @map("resolved_at") @db.Timestamptz(3)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  application           DriverApplication @relation(fields: [driverApplicationId], references: [id], onDelete: Restrict)
+  payouts               DriverPayout[]
+
+  @@map("driver_bank_accounts")
+}
+
+model DriverPayout {
+  id                   String            @id @default(uuid()) @db.Uuid
+  rideOfferId          String            @unique @map("ride_offer_id") @db.Uuid
+  driverApplicationId  String            @map("driver_application_id") @db.Uuid
+  bankAccountId        String            @map("bank_account_id") @db.Uuid
+  status               PayoutStatus      @default(SCHEDULED)
+  amountKobo           BigInt            @map("amount_kobo")
+  currency             String            @db.Char(3)
+  reference            String            @unique @db.VarChar(50)
+  providerTransferCode String?           @unique @map("provider_transfer_code") @db.VarChar(40)
+  providerMessage      String?           @map("provider_message") @db.VarChar(280)
+  scheduledFor         DateTime          @map("scheduled_for") @db.Timestamptz(3)
+  attemptedAt          DateTime?         @map("attempted_at") @db.Timestamptz(3)
+  submittedAt          DateTime?         @map("submitted_at") @db.Timestamptz(3)
+  completedAt          DateTime?         @map("completed_at") @db.Timestamptz(3)
+  failedAt             DateTime?         @map("failed_at") @db.Timestamptz(3)
+  attemptCount         Int               @default(0) @map("attempt_count")
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  rideOffer            RideOffer         @relation(fields: [rideOfferId], references: [id], onDelete: Restrict)
+  driverApplication    DriverApplication @relation(fields: [driverApplicationId], references: [id], onDelete: Restrict)
+  bankAccount          DriverBankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  ledgerJournals       LedgerJournal[]
+
+  @@index([status, scheduledFor], map: "driver_payouts_status_scheduled_idx")
+  @@index([driverApplicationId, createdAt(sort: Desc)], map: "driver_payouts_driver_created_idx")
+  @@map("driver_payouts")
 }
 
 model LedgerEntry {
