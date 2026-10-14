@@ -499,31 +499,40 @@ export class RideService {
       throw new ConflictException("Ride cannot be completed");
     }
 
-    await this.database.client.$transaction(async (transaction) => {
-      await this.lockRide(transaction, ride.id);
-      const completedAt = new Date();
-      const completed = await transaction.rideOffer.updateMany({
-        where: {
-          id: ride.id,
-          driverApplication: { userId },
-          status: RideStatus.IN_PROGRESS,
-        },
-        data: { status: RideStatus.COMPLETED, completedAt },
-      });
+    const payout = await this.database.client.$transaction(
+      async (transaction) => {
+        await this.lockRide(transaction, ride.id);
+        const completedAt = new Date();
+        const completed = await transaction.rideOffer.updateMany({
+          where: {
+            id: ride.id,
+            driverApplication: { userId },
+            status: RideStatus.IN_PROGRESS,
+          },
+          data: { status: RideStatus.COMPLETED, completedAt },
+        });
 
-      if (completed.count !== 1) {
-        throw new ConflictException("Ride cannot be completed");
-      }
+        if (completed.count !== 1) {
+          throw new ConflictException("Ride cannot be completed");
+        }
 
-      await transaction.rideBooking.updateMany({
-        where: {
-          rideOfferId: ride.id,
-          status: BookingStatus.IN_PROGRESS,
-        },
-        data: { status: BookingStatus.COMPLETED, completedAt },
-      });
-      await this.payments.settleRideBookings(transaction, ride.id);
-    });
+        await transaction.rideBooking.updateMany({
+          where: {
+            rideOfferId: ride.id,
+            status: BookingStatus.IN_PROGRESS,
+          },
+          data: { status: BookingStatus.COMPLETED, completedAt },
+        });
+        await this.payments.settleRideBookings(transaction, ride.id);
+        return this.payments.scheduleRidePayout(
+          transaction,
+          ride.id,
+          completedAt,
+        );
+      },
+    );
+
+    await this.payments.enqueuePayout(payout);
 
     return this.get(userId, rideId);
   }

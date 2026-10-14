@@ -7,10 +7,11 @@ import {
 } from "./ledger.policy.js";
 
 export interface CreateJournalInput {
-  bookingId: string;
+  bookingId?: string;
   paymentId?: string;
   refundId?: string;
   userId?: string;
+  payoutId?: string;
   kind: LedgerJournalKind;
   idempotencyKey: string;
   currency: string;
@@ -19,7 +20,7 @@ export interface CreateJournalInput {
 
 export interface LedgerJournalResponse {
   id: string;
-  bookingId: string;
+  bookingId: string | null;
   kind: string;
   currency: string;
   entries: Array<{
@@ -52,13 +53,14 @@ export class LedgerService {
 
     await transaction.ledgerJournal.create({
       data: {
-        bookingId: input.bookingId,
         kind: input.kind,
         idempotencyKey: input.idempotencyKey,
         currency: input.currency,
+        ...(input.bookingId ? { bookingId: input.bookingId } : {}),
         ...(input.paymentId ? { paymentId: input.paymentId } : {}),
         ...(input.refundId ? { refundId: input.refundId } : {}),
         ...(input.userId ? { userId: input.userId } : {}),
+        ...(input.payoutId ? { payoutId: input.payoutId } : {}),
         entries: { create: input.entries },
       },
     });
@@ -67,12 +69,11 @@ export class LedgerService {
   async getMine(userId: string): Promise<LedgerJournalResponse[]> {
     const journals = await this.database.client.ledgerJournal.findMany({
       where: {
-        booking: {
-          OR: [
-            { passengerUserId: userId },
-            { rideOffer: { driverApplication: { userId } } },
-          ],
-        },
+        OR: [
+          { booking: { passengerUserId: userId } },
+          { booking: { rideOffer: { driverApplication: { userId } } } },
+          { payout: { driverApplication: { userId } } },
+        ],
       },
       include: { entries: { orderBy: { createdAt: "asc" } } },
       orderBy: { createdAt: "desc" },

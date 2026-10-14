@@ -21,4 +21,18 @@ describe("payment schemas", () => {
       }),
     ).toMatchObject({ event: "charge.success" });
   });
+
+  it("accepts a transfer webhook in kobo", () => {
+    expect(
+      paystackWebhookSchema.parse({
+        event: "transfer.success",
+        data: {
+          reference: "csp_1234567890123456",
+          transfer_code: "TRF_testtransfer",
+          amount: 200_000,
+          currency: "NGN",
+        },
+      }),
+    ).toMatchObject({ event: "transfer.success" });
+  });
 });

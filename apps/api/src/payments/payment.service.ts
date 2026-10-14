@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { AppConfig } from "@commuteshare/config";
 import {
+  BankAccountStatus,
   BookingStatus,
+  LedgerAccount,
+  LedgerDirection,
   LedgerJournalKind,
   PaymentStatus,
+  PayoutStatus,
   Prisma,
   RefundKind,
   RefundStatus,
@@ -14,6 +18,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -22,6 +27,8 @@ import { DatabaseService } from "../infrastructure/database.service.js";
 import {
   calculateRefund,
   escrowFundedEntries,
+  payoutReversedEntries,
+  payoutSettledEntries,
   refundReservedEntries,
   refundSettledEntries,
   tripSettledEntries,
@@ -32,6 +39,7 @@ import type {
   InitializeCheckoutInput,
   PaystackWebhook,
 } from "./payment.schemas.js";
+import { PayoutQueueService } from "./payout-queue.service.js";
 import { PaystackClient } from "./paystack.client.js";
 
 const paymentInclude = {
@@ -94,13 +102,38 @@ export interface RefundResponse {
   updatedAt: string;
 }
 
+export interface PayoutResponse {
+  id: string;
+  rideId: string;
+  status: string;
+  amountKobo: number;
+  currency: string;
+  maskedAccountNumber: string;
+  bankName: string;
+  scheduledFor: string;
+  submittedAt: string | null;
+  completedAt: string | null;
+  failedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ScheduledPayout {
+  id: string;
+  scheduledFor: Date;
+}
+
 @Injectable()
 export class PaymentService {
+  private readonly logger = new Logger(PaymentService.name);
+
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(PaystackClient) private readonly paystack: PaystackClient,
     @Inject(LedgerService) private readonly ledger: LedgerService,
+    @Inject(PayoutQueueService)
+    private readonly payoutQueue: PayoutQueueService,
   ) {}
 
   async initializeCheckout(
@@ -176,6 +209,11 @@ export class PaymentService {
   }
 
   async handlePaystackWebhook(event: PaystackWebhook): Promise<void> {
+    if (event.event.startsWith("transfer.")) {
+      await this.handleTransferWebhook(event);
+      return;
+    }
+
     if (event.event.startsWith("refund.")) {
       await this.handleRefundWebhook(event);
       return;
@@ -359,6 +397,119 @@ export class PaymentService {
     }
 
     return this.toRefundResponse(refund);
+  }
+
+  async getPayouts(userId: string): Promise<PayoutResponse[]> {
+    const payouts = await this.database.client.driverPayout.findMany({
+      where: { driverApplication: { userId } },
+      include: { bankAccount: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+
+    return payouts.map((payout) => ({
+      id: payout.id,
+      rideId: payout.rideOfferId,
+      status: payout.status,
+      amountKobo: Number(payout.amountKobo),
+      currency: payout.currency,
+      maskedAccountNumber: `******${payout.bankAccount.accountNumberLast4}`,
+      bankName: payout.bankAccount.bankName,
+      scheduledFor: payout.scheduledFor.toISOString(),
+      submittedAt: payout.submittedAt?.toISOString() ?? null,
+      completedAt: payout.completedAt?.toISOString() ?? null,
+      failedAt: payout.failedAt?.toISOString() ?? null,
+      createdAt: payout.createdAt.toISOString(),
+      updatedAt: payout.updatedAt.toISOString(),
+    }));
+  }
+
+  async scheduleRidePayout(
+    transaction: Prisma.TransactionClient,
+    rideId: string,
+    completedAt: Date,
+  ): Promise<ScheduledPayout | null> {
+    const existing = await transaction.driverPayout.findUnique({
+      where: { rideOfferId: rideId },
+      select: { id: true, scheduledFor: true },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const ride = await transaction.rideOffer.findUnique({
+      where: { id: rideId },
+      select: {
+        currency: true,
+        driverApplicationId: true,
+        driverApplication: { select: { bankAccount: true } },
+      },
+    });
+
+    if (
+      !ride?.driverApplication.bankAccount ||
+      ride.driverApplication.bankAccount.status !== BankAccountStatus.VERIFIED
+    ) {
+      throw new ConflictException("Verified driver bank account required");
+    }
+
+    const [credits, debits] = await Promise.all([
+      transaction.ledgerEntry.aggregate({
+        where: {
+          account: LedgerAccount.DRIVER_PAYABLE,
+          direction: LedgerDirection.CREDIT,
+          journal: { booking: { rideOfferId: rideId } },
+        },
+        _sum: { amountKobo: true },
+      }),
+      transaction.ledgerEntry.aggregate({
+        where: {
+          account: LedgerAccount.DRIVER_PAYABLE,
+          direction: LedgerDirection.DEBIT,
+          journal: { booking: { rideOfferId: rideId } },
+        },
+        _sum: { amountKobo: true },
+      }),
+    ]);
+    const amountKobo =
+      (credits._sum.amountKobo ?? 0n) - (debits._sum.amountKobo ?? 0n);
+
+    if (amountKobo <= 0n) {
+      return null;
+    }
+
+    const payout = await transaction.driverPayout.create({
+      data: {
+        rideOfferId: rideId,
+        driverApplicationId: ride.driverApplicationId,
+        bankAccountId: ride.driverApplication.bankAccount.id,
+        amountKobo,
+        currency: ride.currency,
+        reference: `csp_${randomUUID().replaceAll("-", "")}`,
+        scheduledFor: new Date(
+          completedAt.getTime() +
+            this.config.PAYOUT_DELAY_HOURS * 60 * 60 * 1_000,
+        ),
+      },
+      select: { id: true, scheduledFor: true },
+    });
+
+    return payout;
+  }
+
+  async enqueuePayout(payout: ScheduledPayout | null): Promise<void> {
+    if (!payout) {
+      return;
+    }
+
+    try {
+      await this.payoutQueue.enqueue(payout.id, payout.scheduledFor);
+    } catch (error) {
+      this.logger.warn(
+        `Payout ${payout.id} remains scheduled for reconciliation: ${this.errorMessage(error)}`,
+      );
+    }
   }
 
   async settleRideBookings(
@@ -619,6 +770,117 @@ export class PaymentService {
           data: {
             status,
             ...(status === RefundStatus.FAILED ? { failedAt: new Date() } : {}),
+          },
+        });
+      }
+    });
+  }
+
+  private async handleTransferWebhook(event: PaystackWebhook): Promise<void> {
+    const reference = event.data.reference;
+
+    if (!reference || event.data.amount === undefined || !event.data.currency) {
+      throw new BadRequestException("Paystack transfer event was incomplete");
+    }
+
+    const payout = await this.database.client.driverPayout.findUnique({
+      where: { reference },
+    });
+
+    if (!payout) {
+      return;
+    }
+    if (BigInt(event.data.amount) !== payout.amountKobo) {
+      throw new BadRequestException("Paystack transfer amount did not match");
+    }
+    if (event.data.currency !== payout.currency) {
+      throw new BadRequestException("Paystack transfer currency did not match");
+    }
+
+    await this.database.client.$transaction(async (transaction) => {
+      await transaction.$queryRaw(
+        Prisma.sql`SELECT id FROM driver_payouts WHERE id = ${payout.id} FOR UPDATE`,
+      );
+      const current = await transaction.driverPayout.findUnique({
+        where: { id: payout.id },
+      });
+
+      if (!current) {
+        return;
+      }
+
+      if (event.event === "transfer.success") {
+        if (
+          current.status === PayoutStatus.SUCCESS ||
+          current.status === PayoutStatus.REVERSED
+        ) {
+          return;
+        }
+
+        const completedAt = new Date();
+        await transaction.driverPayout.update({
+          where: { id: current.id },
+          data: {
+            status: PayoutStatus.SUCCESS,
+            completedAt,
+            failedAt: null,
+            ...(event.data.transfer_code
+              ? { providerTransferCode: event.data.transfer_code }
+              : {}),
+          },
+        });
+        await this.ledger.createJournal(transaction, {
+          payoutId: current.id,
+          kind: LedgerJournalKind.PAYOUT_SETTLED,
+          idempotencyKey: `payout:${current.id}:settled`,
+          currency: current.currency,
+          entries: payoutSettledEntries(current.amountKobo),
+        });
+        return;
+      }
+
+      if (event.event === "transfer.reversed") {
+        if (current.status === PayoutStatus.REVERSED) {
+          return;
+        }
+
+        if (current.status === PayoutStatus.SUCCESS) {
+          await this.ledger.createJournal(transaction, {
+            payoutId: current.id,
+            kind: LedgerJournalKind.PAYOUT_REVERSED,
+            idempotencyKey: `payout:${current.id}:reversed`,
+            currency: current.currency,
+            entries: payoutReversedEntries(current.amountKobo),
+          });
+        }
+
+        await transaction.driverPayout.update({
+          where: { id: current.id },
+          data: {
+            status: PayoutStatus.REVERSED,
+            completedAt: null,
+            failedAt: new Date(),
+            ...(event.data.transfer_code
+              ? { providerTransferCode: event.data.transfer_code }
+              : {}),
+          },
+        });
+        return;
+      }
+
+      if (
+        event.event === "transfer.failed" &&
+        current.status !== PayoutStatus.SUCCESS &&
+        current.status !== PayoutStatus.REVERSED
+      ) {
+        await transaction.driverPayout.update({
+          where: { id: current.id },
+          data: {
+            status: PayoutStatus.FAILED,
+            failedAt: new Date(),
+            ...(event.data.transfer_code
+              ? { providerTransferCode: event.data.transfer_code }
+              : {}),
           },
         });
       }
