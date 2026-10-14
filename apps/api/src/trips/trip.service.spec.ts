@@ -25,6 +25,7 @@ describe("trip service", () => {
     ]);
     expect(bookings.getMine).toHaveBeenCalledWith("user-id", [
       BookingStatus.PENDING,
+      BookingStatus.AWAITING_PAYMENT,
       BookingStatus.CONFIRMED,
       BookingStatus.IN_PROGRESS,
     ]);

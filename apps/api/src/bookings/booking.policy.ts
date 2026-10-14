@@ -2,6 +2,7 @@ import { BookingStatus } from "@commuteshare/database";
 
 export const ACTIVE_BOOKING_STATUSES = [
   BookingStatus.PENDING,
+  BookingStatus.AWAITING_PAYMENT,
   BookingStatus.CONFIRMED,
 ] as const;
 

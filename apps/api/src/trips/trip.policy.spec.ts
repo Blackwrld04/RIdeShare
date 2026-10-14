@@ -29,6 +29,7 @@ describe("trip policy", () => {
     ]);
     expect(getBookingStatusesForView("upcoming")).toEqual([
       BookingStatus.PENDING,
+      BookingStatus.AWAITING_PAYMENT,
       BookingStatus.CONFIRMED,
       BookingStatus.IN_PROGRESS,
     ]);

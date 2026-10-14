@@ -16,6 +16,7 @@ const RIDE_STATUSES_BY_VIEW = {
 const BOOKING_STATUSES_BY_VIEW = {
   upcoming: [
     BookingStatus.PENDING,
+    BookingStatus.AWAITING_PAYMENT,
     BookingStatus.CONFIRMED,
     BookingStatus.IN_PROGRESS,
   ],

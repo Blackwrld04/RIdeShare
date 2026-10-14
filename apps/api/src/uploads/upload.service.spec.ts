@@ -12,6 +12,7 @@ const config = loadConfig({
   AUTH_REFRESH_TOKEN_SECRET: "b".repeat(32),
   OTP_HMAC_SECRET: "c".repeat(32),
   OTP_DEV_CODE: "000000",
+  PAYSTACK_SECRET_KEY: "sk_test_commuteshare_local",
   STORAGE_BUCKET: "commuteshare-private",
   STORAGE_ACCESS_KEY_ID: "commuteshare",
   STORAGE_SECRET_ACCESS_KEY: "commuteshare-local-secret",

@@ -227,6 +227,7 @@ export class RideService {
             FROM ride_bookings
             WHERE status IN (
               'PENDING'::booking_status,
+              'AWAITING_PAYMENT'::booking_status,
               'CONFIRMED'::booking_status
             )
             GROUP BY ride_offer_id
@@ -462,7 +463,9 @@ export class RideService {
       await transaction.rideBooking.updateMany({
         where: {
           rideOfferId: ride.id,
-          status: BookingStatus.PENDING,
+          status: {
+            in: [BookingStatus.PENDING, BookingStatus.AWAITING_PAYMENT],
+          },
         },
         data: {
           status: BookingStatus.EXPIRED,

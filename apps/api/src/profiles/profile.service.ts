@@ -1,4 +1,10 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@commuteshare/database";
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { DatabaseService } from "../infrastructure/database.service.js";
 import type { UpdateProfileInput } from "./profile.schemas.js";
 
@@ -7,6 +13,7 @@ export interface ProfileResponse {
   phone: string;
   status: string;
   displayName: string | null;
+  billingEmail: string | null;
   bio: string | null;
   timezone: string;
   profileComplete: boolean;
@@ -33,6 +40,7 @@ export class ProfileService {
       phone: user.phoneE164,
       status: user.status,
       displayName: user.profile.displayName,
+      billingEmail: user.profile.billingEmail,
       bio: user.profile.bio,
       timezone: user.profile.timezone,
       profileComplete: Boolean(user.profile.displayName),
@@ -43,15 +51,28 @@ export class ProfileService {
     userId: string,
     input: UpdateProfileInput,
   ): Promise<ProfileResponse> {
-    await this.database.client.userProfile.update({
-      where: { userId },
-      data: {
-        ...(input.displayName !== undefined
-          ? { displayName: input.displayName }
-          : {}),
-        ...(input.bio !== undefined ? { bio: input.bio } : {}),
-      },
-    });
+    try {
+      await this.database.client.userProfile.update({
+        where: { userId },
+        data: {
+          ...(input.displayName !== undefined
+            ? { displayName: input.displayName }
+            : {}),
+          ...(input.billingEmail !== undefined
+            ? { billingEmail: input.billingEmail }
+            : {}),
+          ...(input.bio !== undefined ? { bio: input.bio } : {}),
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException("Billing email is already in use");
+      }
+      throw error;
+    }
 
     return this.get(userId);
   }
