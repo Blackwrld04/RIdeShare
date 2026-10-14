@@ -11,6 +11,7 @@ import { NotificationModule } from "./notifications/notification.module.js";
 import { PaymentModule } from "./payments/payment.module.js";
 import { ProfileModule } from "./profiles/profile.module.js";
 import { RideModule } from "./rides/ride.module.js";
+import { SafetyModule } from "./safety/safety.module.js";
 import { TripModule } from "./trips/trip.module.js";
 import { UploadModule } from "./uploads/upload.module.js";
 
@@ -28,6 +29,7 @@ import { UploadModule } from "./uploads/upload.module.js";
     DriverModule,
     UploadModule,
     RideModule,
+    SafetyModule,
     TripModule,
   ],
   controllers: [HealthController],
