@@ -3,6 +3,7 @@ import {
   checkDatabase,
   createDatabase,
   type Database,
+  type PrismaClient,
 } from "@commuteshare/database";
 import { Inject, Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { APP_CONFIG } from "../config.provider.js";
@@ -17,6 +18,10 @@ export class DatabaseService implements OnApplicationShutdown {
 
   async ping(): Promise<void> {
     await checkDatabase(this.database);
+  }
+
+  get client(): PrismaClient {
+    return this.database.client;
   }
 
   async onApplicationShutdown(): Promise<void> {
