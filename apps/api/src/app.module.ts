@@ -4,9 +4,16 @@ import { DriverModule } from "./driver/driver.module.js";
 import { HealthController } from "./health.controller.js";
 import { InfrastructureModule } from "./infrastructure/infrastructure.module.js";
 import { ProfileModule } from "./profiles/profile.module.js";
+import { UploadModule } from "./uploads/upload.module.js";
 
 @Module({
-  imports: [InfrastructureModule, AuthModule, ProfileModule, DriverModule],
+  imports: [
+    InfrastructureModule,
+    AuthModule,
+    ProfileModule,
+    DriverModule,
+    UploadModule,
+  ],
   controllers: [HealthController],
 })
 export class AppModule {}
