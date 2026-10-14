@@ -11,6 +11,11 @@ const identityEncryptionKeySchema = z.string().refine((value) => {
 export const PAYOUT_QUEUE_NAME = "driver-payouts";
 export const PROCESS_PAYOUT_JOB = "process-payout";
 export const RECONCILE_PAYOUTS_JOB = "reconcile-payouts";
+export const RIDE_SCHEDULING_QUEUE_NAME = "ride-scheduling";
+export const MATERIALIZE_RIDE_SERIES_JOB = "materialize-ride-series";
+export const MATERIALIZE_ACTIVE_RIDE_SERIES_JOB =
+  "materialize-active-ride-series";
+export const CREATE_RIDE_REMINDERS_JOB = "create-ride-reminders";
 
 const environmentSchema = z
   .object({
@@ -104,6 +109,18 @@ const environmentSchema = z
       .min(0)
       .max(10_000_000)
       .default(50_000),
+    RIDE_SERIES_MATERIALIZATION_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(900)
+      .max(86_400)
+      .default(21_600),
+    RIDE_REMINDER_SCAN_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(3_600)
+      .default(900),
     PAYOUT_DELAY_HOURS: z.coerce.number().int().min(1).max(168).default(24),
     PAYOUT_RECONCILIATION_SECONDS: z.coerce
       .number()
