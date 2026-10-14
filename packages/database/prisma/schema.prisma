@@ -66,6 +66,7 @@ enum RidePointKind {
 
 enum BookingStatus {
   PENDING
+  AWAITING_PAYMENT
   CONFIRMED
   IN_PROGRESS
   COMPLETED
@@ -74,6 +75,23 @@ enum BookingStatus {
   EXPIRED
 
   @@map("booking_status")
+}
+
+enum PaymentProvider {
+  PAYSTACK
+
+  @@map("payment_provider")
+}
+
+enum PaymentStatus {
+  INITIALIZING
+  INITIALIZED
+  SUCCEEDED
+  FAILED
+  REFUND_PENDING
+  REFUNDED
+
+  @@map("payment_status")
 }
 
 model User {
@@ -93,13 +111,14 @@ model User {
 }
 
 model UserProfile {
-  userId      String   @id @map("user_id") @db.Uuid
-  displayName String?  @map("display_name") @db.VarChar(80)
-  bio         String?  @db.VarChar(280)
-  timezone    String   @default("Africa/Lagos") @db.VarChar(64)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String   @id @map("user_id") @db.Uuid
+  displayName  String?  @map("display_name") @db.VarChar(80)
+  billingEmail String?  @unique @map("billing_email") @db.VarChar(255)
+  bio          String?  @db.VarChar(280)
+  timezone     String   @default("Africa/Lagos") @db.VarChar(64)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_profiles")
 }
@@ -264,26 +283,54 @@ model RideRoutePoint {
 }
 
 model RideBooking {
-  id                    String        @id @default(uuid()) @db.Uuid
-  rideOfferId           String        @map("ride_offer_id") @db.Uuid
-  passengerUserId       String        @map("passenger_user_id") @db.Uuid
-  seats                 Int           @db.SmallInt
-  status                BookingStatus @default(PENDING)
-  unitContributionKobo  BigInt        @map("unit_contribution_kobo")
-  totalContributionKobo BigInt        @map("total_contribution_kobo")
-  currency              String        @db.Char(3)
-  decidedAt             DateTime?     @map("decided_at") @db.Timestamptz(3)
-  decisionReason        String?       @map("decision_reason") @db.VarChar(280)
-  startedAt             DateTime?     @map("started_at") @db.Timestamptz(3)
-  completedAt           DateTime?     @map("completed_at") @db.Timestamptz(3)
-  cancelledAt           DateTime?     @map("cancelled_at") @db.Timestamptz(3)
-  cancellationReason    String?       @map("cancellation_reason") @db.VarChar(280)
-  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
-  rideOffer             RideOffer     @relation(fields: [rideOfferId], references: [id], onDelete: Cascade)
-  passenger             User          @relation(fields: [passengerUserId], references: [id], onDelete: Cascade)
+  id                    String               @id @default(uuid()) @db.Uuid
+  rideOfferId           String               @map("ride_offer_id") @db.Uuid
+  passengerUserId       String               @map("passenger_user_id") @db.Uuid
+  seats                 Int                  @db.SmallInt
+  status                BookingStatus        @default(PENDING)
+  unitContributionKobo  BigInt               @map("unit_contribution_kobo")
+  totalContributionKobo BigInt               @map("total_contribution_kobo")
+  currency              String               @db.Char(3)
+  decidedAt             DateTime?            @map("decided_at") @db.Timestamptz(3)
+  decisionReason        String?              @map("decision_reason") @db.VarChar(280)
+  startedAt             DateTime?            @map("started_at") @db.Timestamptz(3)
+  completedAt           DateTime?            @map("completed_at") @db.Timestamptz(3)
+  cancelledAt           DateTime?            @map("cancelled_at") @db.Timestamptz(3)
+  cancellationReason    String?              @map("cancellation_reason") @db.VarChar(280)
+  createdAt             DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  rideOffer             RideOffer            @relation(fields: [rideOfferId], references: [id], onDelete: Cascade)
+  passenger             User                 @relation(fields: [passengerUserId], references: [id], onDelete: Cascade)
+  payments              PaymentTransaction[]
 
   @@index([rideOfferId, status], map: "ride_bookings_offer_status_idx")
   @@index([passengerUserId, createdAt(sort: Desc)], map: "ride_bookings_passenger_created_idx")
   @@map("ride_bookings")
+}
+
+model PaymentTransaction {
+  id                    String          @id @default(uuid()) @db.Uuid
+  bookingId             String          @map("booking_id") @db.Uuid
+  provider              PaymentProvider @default(PAYSTACK)
+  status                PaymentStatus   @default(INITIALIZING)
+  reference             String          @unique @db.VarChar(100)
+  baseAmountKobo        BigInt          @map("base_amount_kobo")
+  platformFeeKobo       BigInt          @map("platform_fee_kobo")
+  amountKobo            BigInt          @map("amount_kobo")
+  currency              String          @db.Char(3)
+  authorizationUrl      String?         @map("authorization_url") @db.VarChar(512)
+  accessCode            String?         @map("access_code") @db.VarChar(100)
+  providerTransactionId String?         @unique @map("provider_transaction_id") @db.VarChar(32)
+  providerMessage       String?         @map("provider_message") @db.VarChar(280)
+  paidAt                DateTime?       @map("paid_at") @db.Timestamptz(3)
+  failedAt              DateTime?       @map("failed_at") @db.Timestamptz(3)
+  refundRequiredAt      DateTime?       @map("refund_required_at") @db.Timestamptz(3)
+  refundedAt            DateTime?       @map("refunded_at") @db.Timestamptz(3)
+  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  booking               RideBooking     @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId, status], map: "payment_transactions_booking_status_idx")
+  @@index([status, createdAt], map: "payment_transactions_status_created_idx")
+  @@map("payment_transactions")
 }

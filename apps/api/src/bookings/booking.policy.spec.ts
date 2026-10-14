@@ -8,12 +8,13 @@ import {
 } from "./booking.policy.js";
 
 describe("booking policy", () => {
-  it.each([BookingStatus.PENDING, BookingStatus.CONFIRMED])(
-    "holds seats for %s bookings",
-    (status) => {
-      expect(holdsSeats(status)).toBe(true);
-    },
-  );
+  it.each([
+    BookingStatus.PENDING,
+    BookingStatus.AWAITING_PAYMENT,
+    BookingStatus.CONFIRMED,
+  ])("holds seats for %s bookings", (status) => {
+    expect(holdsSeats(status)).toBe(true);
+  });
 
   it.each([
     BookingStatus.DECLINED,

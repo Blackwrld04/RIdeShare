@@ -6,6 +6,8 @@ export {
   BookingStatus,
   DriverApplicationStatus,
   DriverDocumentStatus,
+  PaymentProvider,
+  PaymentStatus,
   Prisma,
   PrismaClient,
   RidePointKind,

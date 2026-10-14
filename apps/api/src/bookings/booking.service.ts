@@ -250,7 +250,7 @@ export class BookingService {
   }
 
   async confirm(userId: string, bookingId: string): Promise<BookingResponse> {
-    await this.decide(userId, bookingId, BookingStatus.CONFIRMED, null);
+    await this.decide(userId, bookingId, BookingStatus.AWAITING_PAYMENT, null);
     return this.getBooking(bookingId);
   }
 
