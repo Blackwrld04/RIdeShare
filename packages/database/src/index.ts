@@ -7,6 +7,8 @@ export {
   DriverDocumentStatus,
   Prisma,
   PrismaClient,
+  RidePointKind,
+  RideStatus,
   UploadStatus,
   UserStatus,
 } from "./generated/prisma/client.js";
