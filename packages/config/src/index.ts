@@ -121,6 +121,19 @@ const environmentSchema = z
       .min(60)
       .max(3_600)
       .default(900),
+    EMERGENCY_CALL_NUMBER: z.string().trim().min(3).max(20).default("112"),
+    SAFETY_SHARE_MAX_HOURS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(720)
+      .default(168),
+    LOCATION_PING_MIN_INTERVAL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(60)
+      .default(2),
     PAYOUT_DELAY_HOURS: z.coerce.number().int().min(1).max(168).default(24),
     PAYOUT_RECONCILIATION_SECONDS: z.coerce
       .number()
