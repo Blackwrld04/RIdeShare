@@ -168,6 +168,14 @@ enum IdentityVerificationStatus {
   @@map("identity_verification_status")
 }
 
+enum RideSeriesStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+
+  @@map("ride_series_status")
+}
+
 model User {
   id                   String                    @id @default(uuid()) @db.Uuid
   phoneE164            String                    @unique @map("phone_e164") @db.VarChar(16)
@@ -182,6 +190,7 @@ model User {
   rideBookings         RideBooking[]
   ledgerJournals       LedgerJournal[]
   identityVerification UserIdentityVerification?
+  notifications        UserNotification[]
 
   @@map("users")
 }
@@ -275,6 +284,7 @@ model DriverApplication {
   rides              RideOffer[]
   bankAccount        DriverBankAccount?
   payouts            DriverPayout[]
+  rideSeries         RideSeries[]
 
   @@index([status, submittedAt], map: "driver_applications_status_submitted_idx")
   @@map("driver_applications")
@@ -355,6 +365,8 @@ model RideOffer {
   routingSource        String?                                   @map("routing_source") @db.VarChar(32)
   routingProfile       String?                                   @map("routing_profile") @db.VarChar(32)
   routeCorridor        Unsupported("geometry(LineString,4326)")? @map("route_corridor")
+  seriesId             String?                                   @map("series_id") @db.Uuid
+  serviceDate          DateTime?                                 @map("service_date") @db.Date
   notes                String?                                   @db.VarChar(280)
   publishedAt          DateTime?                                 @map("published_at") @db.Timestamptz(3)
   startedAt            DateTime?                                 @map("started_at") @db.Timestamptz(3)
@@ -367,10 +379,62 @@ model RideOffer {
   routePoints          RideRoutePoint[]
   bookings             RideBooking[]
   payout               DriverPayout?
+  series               RideSeries?                               @relation(fields: [seriesId], references: [id], onDelete: Restrict)
 
+  @@unique([seriesId, serviceDate], map: "ride_offers_series_service_date_key")
   @@index([driverApplicationId, departureAt(sort: Desc)], map: "ride_offers_driver_departure_idx")
   @@index([status, departureAt], map: "ride_offers_status_departure_idx")
   @@map("ride_offers")
+}
+
+model RideSeries {
+  id                   String                                    @id @default(uuid()) @db.Uuid
+  driverApplicationId  String                                    @map("driver_application_id") @db.Uuid
+  status               RideSeriesStatus                          @default(ACTIVE)
+  timezone             String                                    @db.VarChar(64)
+  departureTimeMinutes Int                                       @map("departure_time_minutes") @db.SmallInt
+  daysOfWeek           Int[]                                     @map("days_of_week") @db.SmallInt
+  startsOn             DateTime                                  @map("starts_on") @db.Date
+  endsOn               DateTime?                                 @map("ends_on") @db.Date
+  lookaheadDays        Int                                       @default(14) @map("lookahead_days") @db.SmallInt
+  passengerSeats       Int                                       @map("passenger_seats") @db.SmallInt
+  contributionKobo     BigInt                                    @map("contribution_kobo")
+  currency             String                                    @default("NGN") @db.Char(3)
+  routePath            Json                                      @map("route_path") @db.JsonB
+  routeDistanceMeters  Int                                       @map("route_distance_meters")
+  routeDurationSeconds Int                                       @map("route_duration_seconds")
+  routingSource        String?                                   @map("routing_source") @db.VarChar(32)
+  routingProfile       String?                                   @map("routing_profile") @db.VarChar(32)
+  routeCorridor        Unsupported("geometry(LineString,4326)")? @map("route_corridor")
+  notes                String?                                   @db.VarChar(280)
+  lastGeneratedThrough DateTime?                                 @map("last_generated_through") @db.Date
+  createdAt            DateTime                                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                                  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  driverApplication    DriverApplication                         @relation(fields: [driverApplicationId], references: [id], onDelete: Restrict)
+  routePoints          RideSeriesRoutePoint[]
+  rides                RideOffer[]
+
+  @@index([driverApplicationId, status], map: "ride_series_driver_status_idx")
+  @@index([status, startsOn, endsOn], map: "ride_series_schedule_idx")
+  @@map("ride_series")
+}
+
+model RideSeriesRoutePoint {
+  id             String        @id @default(uuid()) @db.Uuid
+  rideSeriesId   String        @map("ride_series_id") @db.Uuid
+  sequence       Int           @db.SmallInt
+  kind           RidePointKind
+  label          String        @db.VarChar(120)
+  address        String?       @db.VarChar(200)
+  latitude       Decimal       @db.Decimal(9, 6)
+  longitude      Decimal       @db.Decimal(9, 6)
+  externalSource String?       @map("external_source") @db.VarChar(32)
+  externalId     String?       @map("external_id") @db.VarChar(128)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  series         RideSeries    @relation(fields: [rideSeriesId], references: [id], onDelete: Cascade)
+
+  @@unique([rideSeriesId, sequence], map: "ride_series_route_points_series_sequence_key")
+  @@map("ride_series_route_points")
 }
 
 model RideRoutePoint {
@@ -564,4 +628,20 @@ model LedgerEntry {
 
   @@index([account, createdAt], map: "ledger_entries_account_created_idx")
   @@map("ledger_entries")
+}
+
+model UserNotification {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  kind           String    @db.VarChar(64)
+  title          String    @db.VarChar(120)
+  body           String    @db.VarChar(500)
+  data           Json?
+  idempotencyKey String    @unique @map("idempotency_key") @db.VarChar(180)
+  readAt         DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt(sort: Desc)], map: "user_notifications_user_read_created_idx")
+  @@map("user_notifications")
 }

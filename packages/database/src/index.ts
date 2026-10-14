@@ -19,6 +19,7 @@ export {
   RefundKind,
   RefundStatus,
   RidePointKind,
+  RideSeriesStatus,
   RideStatus,
   UploadStatus,
   UserStatus,
