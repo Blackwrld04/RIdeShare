@@ -1,6 +1,6 @@
 import {
   DriverApplicationStatus,
-  type Prisma,
+  Prisma,
   RideStatus,
 } from "@commuteshare/database";
 import {
@@ -20,6 +20,7 @@ import {
 import type {
   CancelRideInput,
   CreateRideInput,
+  SearchRidesInput,
   UpdateRideInput,
 } from "./ride.schemas.js";
 
@@ -83,6 +84,17 @@ export interface RideOfferResponse {
   updatedAt: string;
 }
 
+export type RideSearchResult = RideOfferResponse & {
+  originDistanceMeters: number;
+  destinationDistanceMeters: number;
+};
+
+interface RideSearchRow {
+  id: string;
+  originDistanceMeters: number;
+  destinationDistanceMeters: number;
+}
+
 @Injectable()
 export class RideService {
   constructor(
@@ -136,6 +148,119 @@ export class RideService {
     }
 
     return this.toResponse(ride);
+  }
+
+  async search(input: SearchRidesInput): Promise<RideSearchResult[]> {
+    const departureFrom = input.departureFrom
+      ? new Date(input.departureFrom)
+      : new Date();
+    const departureTo = input.departureTo
+      ? new Date(input.departureTo)
+      : new Date(departureFrom.getTime() + 24 * 60 * 60 * 1_000);
+
+    if (departureTo <= departureFrom) {
+      throw new BadRequestException(
+        "Departure end must be after departure start",
+      );
+    }
+
+    if (
+      departureTo.getTime() - departureFrom.getTime() >
+      7 * 24 * 60 * 60 * 1_000
+    ) {
+      throw new BadRequestException(
+        "Ride search window cannot exceed seven days",
+      );
+    }
+
+    const matches = await this.database.client.$queryRaw<RideSearchRow[]>(
+      Prisma.sql`
+        WITH matching_rides AS (
+          SELECT
+            ride.id,
+            ride.departure_at AS "departureAt",
+            ST_Distance(
+              origin.location,
+              ST_SetSRID(
+                ST_MakePoint(${input.originLongitude}, ${input.originLatitude}),
+                4326
+              )::geography
+            ) AS "originDistanceMeters",
+            ST_Distance(
+              destination.location,
+              ST_SetSRID(
+                ST_MakePoint(
+                  ${input.destinationLongitude},
+                  ${input.destinationLatitude}
+                ),
+                4326
+              )::geography
+            ) AS "destinationDistanceMeters"
+          FROM ride_offers AS ride
+          INNER JOIN ride_route_points AS origin
+            ON origin.ride_offer_id = ride.id
+            AND origin.kind = 'ORIGIN'::ride_point_kind
+          INNER JOIN ride_route_points AS destination
+            ON destination.ride_offer_id = ride.id
+            AND destination.kind = 'DESTINATION'::ride_point_kind
+          WHERE ride.status = 'PUBLISHED'::ride_status
+            AND ride.departure_at >= ${departureFrom}
+            AND ride.departure_at <= ${departureTo}
+            AND ride.passenger_seats >= ${input.seats}
+            AND ST_DWithin(
+              origin.location,
+              ST_SetSRID(
+                ST_MakePoint(${input.originLongitude}, ${input.originLatitude}),
+                4326
+              )::geography,
+              ${input.radiusMeters}
+            )
+            AND ST_DWithin(
+              destination.location,
+              ST_SetSRID(
+                ST_MakePoint(
+                  ${input.destinationLongitude},
+                  ${input.destinationLatitude}
+                ),
+                4326
+              )::geography,
+              ${input.radiusMeters}
+            )
+        )
+        SELECT id, "originDistanceMeters", "destinationDistanceMeters"
+        FROM matching_rides
+        ORDER BY
+          "departureAt" ASC,
+          "originDistanceMeters" + "destinationDistanceMeters" ASC
+        LIMIT ${input.limit}
+      `,
+    );
+
+    if (matches.length === 0) {
+      return [];
+    }
+
+    const rides = await this.database.client.rideOffer.findMany({
+      where: { id: { in: matches.map((match) => match.id) } },
+      include: rideInclude,
+    });
+    const ridesById = new Map(rides.map((ride) => [ride.id, ride]));
+
+    return matches.flatMap((match) => {
+      const ride = ridesById.get(match.id);
+
+      return ride
+        ? [
+            {
+              ...this.toResponse(ride),
+              originDistanceMeters: Math.round(match.originDistanceMeters),
+              destinationDistanceMeters: Math.round(
+                match.destinationDistanceMeters,
+              ),
+            },
+          ]
+        : [];
+    });
   }
 
   async update(

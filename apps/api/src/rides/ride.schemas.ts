@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+const coordinateSchema = (minimum: number, maximum: number) =>
+  z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? Number.NaN : value,
+    z.coerce.number().min(minimum).max(maximum),
+  );
+
 export const routePointSchema = z
   .object({
     label: z.string().trim().min(2).max(120),
@@ -70,8 +77,33 @@ export const cancelRideSchema = z
 
 export const rideIdSchema = z.uuid();
 
+export const searchRidesSchema = z
+  .object({
+    originLatitude: coordinateSchema(-90, 90),
+    originLongitude: coordinateSchema(-180, 180),
+    destinationLatitude: coordinateSchema(-90, 90),
+    destinationLongitude: coordinateSchema(-180, 180),
+    radiusMeters: z.coerce.number().int().min(250).max(25_000).default(5_000),
+    departureFrom: z.iso.datetime({ offset: true }).optional(),
+    departureTo: z.iso.datetime({ offset: true }).optional(),
+    seats: z.coerce.number().int().min(1).max(7).default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      !value.departureFrom ||
+      !value.departureTo ||
+      new Date(value.departureTo) > new Date(value.departureFrom),
+    {
+      path: ["departureTo"],
+      message: "Departure end must be after departure start",
+    },
+  );
+
 export type RoutePointInput = z.infer<typeof routePointSchema>;
 export type RideRouteInput = z.infer<typeof rideRouteSchema>;
 export type CreateRideInput = z.infer<typeof createRideSchema>;
 export type UpdateRideInput = z.infer<typeof updateRideSchema>;
 export type CancelRideInput = z.infer<typeof cancelRideSchema>;
+export type SearchRidesInput = z.infer<typeof searchRidesSchema>;

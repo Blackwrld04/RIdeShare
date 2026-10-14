@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -20,10 +21,16 @@ import {
   cancelRideSchema,
   createRideSchema,
   rideIdSchema,
+  type SearchRidesInput,
+  searchRidesSchema,
   type UpdateRideInput,
   updateRideSchema,
 } from "./ride.schemas.js";
-import { type RideOfferResponse, RideService } from "./ride.service.js";
+import {
+  type RideOfferResponse,
+  type RideSearchResult,
+  RideService,
+} from "./ride.service.js";
 
 @Controller("rides")
 @UseGuards(AccessTokenGuard)
@@ -41,6 +48,13 @@ export class RideController {
   @Get("mine")
   getMine(@Req() request: AuthenticatedRequest): Promise<RideOfferResponse[]> {
     return this.rides.getMine(request.auth.userId);
+  }
+
+  @Get("search")
+  search(
+    @Query(new ZodValidationPipe(searchRidesSchema)) input: SearchRidesInput,
+  ): Promise<RideSearchResult[]> {
+    return this.rides.search(input);
   }
 
   @Get(":rideId")
