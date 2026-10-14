@@ -24,6 +24,17 @@ const verifyResponseSchema = z.object({
   }),
 });
 
+const refundResponseSchema = z.object({
+  status: z.literal(true),
+  message: z.string(),
+  data: z.object({
+    id: z.union([z.number().int().nonnegative(), z.string().min(1)]),
+    status: z.string().min(1),
+    amount: z.number().int().positive(),
+    currency: z.string().length(3),
+  }),
+});
+
 export interface InitializePaystackTransactionInput {
   email: string;
   amountKobo: number;
@@ -48,11 +59,29 @@ export interface VerifiedPaystackTransaction {
   paidAt: Date | null;
 }
 
+export interface CreatePaystackRefundInput {
+  transactionReference: string;
+  amountKobo: number;
+  currency: string;
+  reason: string;
+}
+
+export interface CreatedPaystackRefund {
+  id: string;
+  status: string;
+  amountKobo: number;
+  currency: string;
+  message: string;
+}
+
 export abstract class PaystackClient {
   abstract initialize(
     input: InitializePaystackTransactionInput,
   ): Promise<InitializedPaystackTransaction>;
   abstract verify(reference: string): Promise<VerifiedPaystackTransaction>;
+  abstract createRefund(
+    input: CreatePaystackRefundInput,
+  ): Promise<CreatedPaystackRefund>;
 }
 
 export class HttpPaystackClient extends PaystackClient {
@@ -101,6 +130,30 @@ export class HttpPaystackClient extends PaystackClient {
       amountKobo: parsed.data.amount,
       currency: parsed.data.currency,
       paidAt: parsed.data.paid_at ? new Date(parsed.data.paid_at) : null,
+    };
+  }
+
+  async createRefund(
+    input: CreatePaystackRefundInput,
+  ): Promise<CreatedPaystackRefund> {
+    const response = await this.request("/refund", {
+      method: "POST",
+      body: JSON.stringify({
+        transaction: input.transactionReference,
+        amount: input.amountKobo,
+        currency: input.currency,
+        customer_note: input.reason,
+        merchant_note: input.reason,
+      }),
+    });
+    const parsed = refundResponseSchema.parse(response);
+
+    return {
+      id: String(parsed.data.id),
+      status: parsed.data.status,
+      amountKobo: parsed.data.amount,
+      currency: parsed.data.currency,
+      message: parsed.message,
     };
   }
 

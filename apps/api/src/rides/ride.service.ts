@@ -17,6 +17,7 @@ import {
   calculateAvailableSeats,
 } from "../bookings/booking.policy.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
+import { PaymentService } from "../payments/payment.service.js";
 import { canCompleteRide, canStartRide } from "../trips/trip.policy.js";
 import {
   buildRoutePoints,
@@ -112,6 +113,7 @@ interface RideSearchRow {
 export class RideService {
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(PaymentService) private readonly payments: PaymentService,
   ) {}
 
   async create(
@@ -434,6 +436,8 @@ export class RideService {
       });
     });
 
+    await this.payments.refundRideBookings(ride.id, input.reason);
+
     return this.get(userId, rideId);
   }
 
@@ -515,6 +519,7 @@ export class RideService {
         },
         data: { status: BookingStatus.COMPLETED, completedAt },
       });
+      await this.payments.settleRideBookings(transaction, ride.id);
     });
 
     return this.get(userId, rideId);

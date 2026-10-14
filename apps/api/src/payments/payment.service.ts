@@ -2,8 +2,11 @@ import { randomUUID } from "node:crypto";
 import type { AppConfig } from "@commuteshare/config";
 import {
   BookingStatus,
+  LedgerJournalKind,
   PaymentStatus,
   Prisma,
+  RefundKind,
+  RefundStatus,
   RideStatus,
 } from "@commuteshare/database";
 import {
@@ -16,6 +19,14 @@ import {
 } from "@nestjs/common";
 import { APP_CONFIG } from "../config.provider.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
+import {
+  calculateRefund,
+  escrowFundedEntries,
+  refundReservedEntries,
+  refundSettledEntries,
+  tripSettledEntries,
+} from "./ledger.policy.js";
+import { LedgerService } from "./ledger.service.js";
 import { calculatePlatformFeeKobo } from "./payment.policy.js";
 import type {
   InitializeCheckoutInput,
@@ -35,6 +46,8 @@ const paymentInclude = {
 type PaymentRecord = Prisma.PaymentTransactionGetPayload<{
   include: typeof paymentInclude;
 }>;
+
+type RefundRecord = Prisma.PaymentRefundGetPayload<Record<string, never>>;
 
 interface ReservedPaymentAttempt {
   paymentId: string;
@@ -64,12 +77,30 @@ export interface PaymentResponse {
   updatedAt: string;
 }
 
+export interface RefundResponse {
+  id: string;
+  paymentId: string;
+  bookingId: string;
+  kind: string;
+  status: string;
+  amountKobo: number;
+  driverCompensationKobo: number;
+  currency: string;
+  reason: string;
+  providerRefundId: string | null;
+  submittedAt: string | null;
+  processedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 @Injectable()
 export class PaymentService {
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(PaystackClient) private readonly paystack: PaystackClient,
+    @Inject(LedgerService) private readonly ledger: LedgerService,
   ) {}
 
   async initializeCheckout(
@@ -145,7 +176,12 @@ export class PaymentService {
   }
 
   async handlePaystackWebhook(event: PaystackWebhook): Promise<void> {
-    if (event.event !== "charge.success") {
+    if (event.event.startsWith("refund.")) {
+      await this.handleRefundWebhook(event);
+      return;
+    }
+
+    if (event.event !== "charge.success" || !event.data.reference) {
       return;
     }
 
@@ -226,6 +262,15 @@ export class PaymentService {
         },
       });
 
+      await this.ledger.createJournal(transaction, {
+        bookingId: current.bookingId,
+        paymentId: current.id,
+        kind: LedgerJournalKind.ESCROW_FUNDED,
+        idempotencyKey: `payment:${current.id}:escrow-funded`,
+        currency: current.currency,
+        entries: escrowFundedEntries(current.amountKobo),
+      });
+
       if (canConfirm) {
         const confirmed = await transaction.rideBooking.updateMany({
           where: {
@@ -242,6 +287,340 @@ export class PaymentService {
         if (confirmed.count !== 1) {
           throw new ConflictException("Booking payment state changed");
         }
+      }
+    });
+
+    const updated = await this.database.client.paymentTransaction.findUnique({
+      where: { id: payment.id },
+      select: { status: true },
+    });
+
+    if (updated?.status === PaymentStatus.REFUND_PENDING) {
+      await this.refundPayment(
+        payment.id,
+        RefundKind.FULFILLMENT_FAILED,
+        "Ride was unavailable when payment completed",
+      );
+    }
+  }
+
+  async refundBooking(
+    bookingId: string,
+    kind: RefundKind,
+    reason: string,
+  ): Promise<void> {
+    const payment = await this.database.client.paymentTransaction.findFirst({
+      where: {
+        bookingId,
+        status: { in: [PaymentStatus.SUCCEEDED, PaymentStatus.REFUND_PENDING] },
+      },
+      orderBy: { paidAt: "desc" },
+      select: { id: true },
+    });
+
+    if (payment) {
+      await this.refundPayment(payment.id, kind, reason);
+    }
+  }
+
+  async refundRideBookings(rideId: string, reason: string): Promise<void> {
+    const payments = await this.database.client.paymentTransaction.findMany({
+      where: {
+        booking: { rideOfferId: rideId },
+        status: { in: [PaymentStatus.SUCCEEDED, PaymentStatus.REFUND_PENDING] },
+      },
+      select: { id: true },
+    });
+
+    for (const payment of payments) {
+      await this.refundPayment(
+        payment.id,
+        RefundKind.DRIVER_CANCELLATION,
+        reason,
+      );
+    }
+  }
+
+  async getRefund(userId: string, refundId: string): Promise<RefundResponse> {
+    const refund = await this.database.client.paymentRefund.findFirst({
+      where: {
+        id: refundId,
+        booking: {
+          OR: [
+            { passengerUserId: userId },
+            { rideOffer: { driverApplication: { userId } } },
+          ],
+        },
+      },
+    });
+
+    if (!refund) {
+      throw new NotFoundException("Refund not found");
+    }
+
+    return this.toRefundResponse(refund);
+  }
+
+  async settleRideBookings(
+    transaction: Prisma.TransactionClient,
+    rideId: string,
+  ): Promise<void> {
+    const payments = await transaction.paymentTransaction.findMany({
+      where: {
+        booking: {
+          rideOfferId: rideId,
+          status: BookingStatus.COMPLETED,
+        },
+        status: PaymentStatus.SUCCEEDED,
+        refund: null,
+      },
+    });
+
+    for (const payment of payments) {
+      await this.ledger.createJournal(transaction, {
+        bookingId: payment.bookingId,
+        paymentId: payment.id,
+        kind: LedgerJournalKind.TRIP_SETTLED,
+        idempotencyKey: `payment:${payment.id}:trip-settled`,
+        currency: payment.currency,
+        entries: tripSettledEntries(
+          payment.baseAmountKobo,
+          payment.platformFeeKobo,
+        ),
+      });
+    }
+  }
+
+  private async refundPayment(
+    paymentId: string,
+    kind: RefundKind,
+    reason: string,
+  ): Promise<void> {
+    const refundId = await this.database.client.$transaction(
+      async (transaction) => {
+        const paymentReference =
+          await transaction.paymentTransaction.findUnique({
+            where: { id: paymentId },
+            select: { booking: { select: { rideOfferId: true } } },
+          });
+
+        if (!paymentReference) {
+          return null;
+        }
+
+        await transaction.$queryRaw(
+          Prisma.sql`SELECT id FROM ride_offers WHERE id = ${paymentReference.booking.rideOfferId} FOR UPDATE`,
+        );
+        const payment = await transaction.paymentTransaction.findUnique({
+          where: { id: paymentId },
+          include: {
+            refund: true,
+            booking: {
+              select: {
+                passengerUserId: true,
+                rideOffer: { select: { departureAt: true } },
+              },
+            },
+          },
+        });
+
+        if (!payment) {
+          return null;
+        }
+        if (payment.refund) {
+          return payment.refund.status === RefundStatus.REQUESTED
+            ? payment.refund.id
+            : null;
+        }
+        if (
+          payment.status !== PaymentStatus.SUCCEEDED &&
+          payment.status !== PaymentStatus.REFUND_PENDING
+        ) {
+          return null;
+        }
+
+        const breakdown = calculateRefund(
+          kind,
+          payment.baseAmountKobo,
+          payment.platformFeeKobo,
+          payment.booking.rideOffer.departureAt,
+        );
+        const refund = await transaction.paymentRefund.create({
+          data: {
+            paymentId: payment.id,
+            bookingId: payment.bookingId,
+            kind,
+            amountKobo: breakdown.refundAmountKobo,
+            driverCompensationKobo: breakdown.driverCompensationKobo,
+            currency: payment.currency,
+            reason,
+          },
+        });
+
+        await transaction.paymentTransaction.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.REFUND_PENDING,
+            refundRequiredAt: payment.refundRequiredAt ?? new Date(),
+          },
+        });
+        await this.ledger.createJournal(transaction, {
+          bookingId: payment.bookingId,
+          paymentId: payment.id,
+          refundId: refund.id,
+          userId: payment.booking.passengerUserId,
+          kind: LedgerJournalKind.REFUND_RESERVED,
+          idempotencyKey: `refund:${refund.id}:reserved`,
+          currency: payment.currency,
+          entries: refundReservedEntries(
+            payment.amountKobo,
+            breakdown.refundAmountKobo,
+            breakdown.driverCompensationKobo,
+          ),
+        });
+
+        return refund.id;
+      },
+    );
+
+    if (refundId) {
+      await this.submitRefund(refundId);
+    }
+  }
+
+  private async submitRefund(refundId: string): Promise<void> {
+    const claimed = await this.database.client.paymentRefund.updateMany({
+      where: { id: refundId, status: RefundStatus.REQUESTED },
+      data: { status: RefundStatus.SUBMITTING },
+    });
+
+    if (claimed.count !== 1) {
+      return;
+    }
+
+    const refund = await this.database.client.paymentRefund.findUniqueOrThrow({
+      where: { id: refundId },
+      include: { payment: { select: { reference: true } } },
+    });
+
+    try {
+      const submitted = await this.paystack.createRefund({
+        transactionReference: refund.payment.reference,
+        amountKobo: Number(refund.amountKobo),
+        currency: refund.currency,
+        reason: refund.reason,
+      });
+
+      if (
+        BigInt(submitted.amountKobo) !== refund.amountKobo ||
+        submitted.currency !== refund.currency
+      ) {
+        throw new Error("Paystack returned an unexpected refund amount");
+      }
+
+      await this.database.client.paymentRefund.updateMany({
+        where: { id: refund.id, status: RefundStatus.SUBMITTING },
+        data: {
+          status:
+            submitted.status === "processing"
+              ? RefundStatus.PROCESSING
+              : RefundStatus.SUBMITTED,
+          providerRefundId: submitted.id,
+          providerMessage: submitted.message.slice(0, 280),
+          submittedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      await this.database.client.paymentRefund.updateMany({
+        where: { id: refund.id, status: RefundStatus.SUBMITTING },
+        data: {
+          status: RefundStatus.FAILED,
+          failedAt: new Date(),
+          providerMessage: this.errorMessage(error),
+        },
+      });
+    }
+  }
+
+  private async handleRefundWebhook(event: PaystackWebhook): Promise<void> {
+    const reference = event.data.transaction_reference;
+
+    if (!reference || event.data.amount === undefined || !event.data.currency) {
+      throw new BadRequestException("Paystack refund event was incomplete");
+    }
+
+    const payment = await this.database.client.paymentTransaction.findUnique({
+      where: { reference },
+      include: { refund: true },
+    });
+
+    if (!payment?.refund) {
+      return;
+    }
+
+    const refund = payment.refund;
+
+    if (BigInt(event.data.amount) !== refund.amountKobo) {
+      throw new BadRequestException("Paystack refund amount did not match");
+    }
+    if (event.data.currency !== refund.currency) {
+      throw new BadRequestException("Paystack refund currency did not match");
+    }
+
+    await this.database.client.$transaction(async (transaction) => {
+      await transaction.$queryRaw(
+        Prisma.sql`SELECT id FROM payment_refunds WHERE id = ${refund.id} FOR UPDATE`,
+      );
+      const current = await transaction.paymentRefund.findUnique({
+        where: { id: refund.id },
+      });
+
+      if (!current) {
+        return;
+      }
+
+      if (current.status === RefundStatus.PROCESSED) {
+        return;
+      }
+
+      if (event.event === "refund.processed") {
+        const processedAt = new Date();
+        await transaction.paymentRefund.update({
+          where: { id: current.id },
+          data: { status: RefundStatus.PROCESSED, processedAt, failedAt: null },
+        });
+        await transaction.paymentTransaction.update({
+          where: { id: current.paymentId },
+          data: { status: PaymentStatus.REFUNDED, refundedAt: processedAt },
+        });
+        await this.ledger.createJournal(transaction, {
+          bookingId: current.bookingId,
+          paymentId: current.paymentId,
+          refundId: current.id,
+          kind: LedgerJournalKind.REFUND_SETTLED,
+          idempotencyKey: `refund:${current.id}:settled`,
+          currency: current.currency,
+          entries: refundSettledEntries(current.amountKobo),
+        });
+        return;
+      }
+
+      const statusByEvent = {
+        "refund.pending": RefundStatus.SUBMITTED,
+        "refund.processing": RefundStatus.PROCESSING,
+        "refund.needs-attention": RefundStatus.NEEDS_ATTENTION,
+        "refund.failed": RefundStatus.FAILED,
+      } as const;
+      const status = statusByEvent[event.event as keyof typeof statusByEvent];
+
+      if (status) {
+        await transaction.paymentRefund.update({
+          where: { id: current.id },
+          data: {
+            status,
+            ...(status === RefundStatus.FAILED ? { failedAt: new Date() } : {}),
+          },
+        });
       }
     });
   }
@@ -386,6 +765,25 @@ export class PaymentService {
       refundRequiredAt: payment.refundRequiredAt?.toISOString() ?? null,
       createdAt: payment.createdAt.toISOString(),
       updatedAt: payment.updatedAt.toISOString(),
+    };
+  }
+
+  private toRefundResponse(refund: RefundRecord): RefundResponse {
+    return {
+      id: refund.id,
+      paymentId: refund.paymentId,
+      bookingId: refund.bookingId,
+      kind: refund.kind,
+      status: refund.status,
+      amountKobo: Number(refund.amountKobo),
+      driverCompensationKobo: Number(refund.driverCompensationKobo),
+      currency: refund.currency,
+      reason: refund.reason,
+      providerRefundId: refund.providerRefundId,
+      submittedAt: refund.submittedAt?.toISOString() ?? null,
+      processedAt: refund.processedAt?.toISOString() ?? null,
+      createdAt: refund.createdAt.toISOString(),
+      updatedAt: refund.updatedAt.toISOString(),
     };
   }
 }
