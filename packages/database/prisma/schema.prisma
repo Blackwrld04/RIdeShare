@@ -7,3 +7,65 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+
+  @@map("user_status")
+}
+
+model User {
+  id              String        @id @default(uuid()) @db.Uuid
+  phoneE164       String        @unique @map("phone_e164") @db.VarChar(16)
+  phoneVerifiedAt DateTime      @map("phone_verified_at") @db.Timestamptz(3)
+  status          UserStatus    @default(ACTIVE)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  profile         UserProfile?
+  sessions        AuthSession[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  userId      String   @id @map("user_id") @db.Uuid
+  displayName String?  @map("display_name") @db.VarChar(80)
+  bio         String?  @db.VarChar(280)
+  timezone    String   @default("Africa/Lagos") @db.VarChar(64)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model PhoneOtpChallenge {
+  id          String    @id @default(uuid()) @db.Uuid
+  phoneE164   String    @map("phone_e164") @db.VarChar(16)
+  codeDigest  String    @map("code_digest") @db.VarChar(64)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5) @map("max_attempts")
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(3)
+  consumedAt  DateTime? @map("consumed_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([phoneE164, createdAt(sort: Desc)], map: "phone_otp_challenges_phone_created_idx")
+  @@map("phone_otp_challenges")
+}
+
+model AuthSession {
+  id                 String    @id @default(uuid()) @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  refreshTokenDigest String    @unique @map("refresh_token_digest") @db.VarChar(64)
+  expiresAt          DateTime  @map("expires_at") @db.Timestamptz(3)
+  lastUsedAt         DateTime? @map("last_used_at") @db.Timestamptz(3)
+  revokedAt          DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "auth_sessions_user_idx")
+  @@index([expiresAt], map: "auth_sessions_expires_idx")
+  @@map("auth_sessions")
+}

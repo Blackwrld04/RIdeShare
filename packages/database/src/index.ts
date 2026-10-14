@@ -2,6 +2,12 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { PrismaClient } from "./generated/prisma/client.js";
 
+export {
+  Prisma,
+  PrismaClient,
+  UserStatus,
+} from "./generated/prisma/client.js";
+
 export interface Database {
   client: PrismaClient;
   close: () => Promise<void>;
