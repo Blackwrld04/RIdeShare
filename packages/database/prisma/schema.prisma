@@ -193,6 +193,10 @@ model User {
   notifications        UserNotification[]
   chatMessages         ChatMessage[]             @relation("ChatMessageSender")
   chatReadReceipts     ChatReadReceipt[]
+  emergencyContacts    EmergencyContact[]
+  rideLocationPings    RideLocationPing[]
+  rideShareLinks       RideShareLink[]
+  safetyAlerts         SafetyAlert[]
 
   @@map("users")
 }
@@ -382,6 +386,9 @@ model RideOffer {
   bookings             RideBooking[]
   payout               DriverPayout?
   series               RideSeries?                               @relation(fields: [seriesId], references: [id], onDelete: Restrict)
+  locationPings        RideLocationPing[]
+  shareLinks           RideShareLink[]
+  safetyAlerts         SafetyAlert[]
 
   @@unique([seriesId, serviceDate], map: "ride_offers_series_service_date_key")
   @@index([driverApplicationId, departureAt(sort: Desc)], map: "ride_offers_driver_departure_idx")
@@ -492,6 +499,7 @@ model RideBooking {
   ledgerJournals        LedgerJournal[]
   chatMessages          ChatMessage[]
   chatReadReceipts      ChatReadReceipt[]
+  safetyAlerts          SafetyAlert[]
 
   @@index([rideOfferId, status], map: "ride_bookings_offer_status_idx")
   @@index([passengerUserId, createdAt(sort: Desc)], map: "ride_bookings_passenger_created_idx")
@@ -680,4 +688,83 @@ model ChatReadReceipt {
 
   @@id([bookingId, userId])
   @@map("chat_read_receipts")
+}
+
+model EmergencyContact {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  name         String   @db.VarChar(80)
+  phoneE164    String   @map("phone_e164") @db.VarChar(16)
+  relationship String?  @db.VarChar(40)
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, phoneE164], map: "emergency_contacts_user_phone_key")
+  @@index([userId, createdAt], map: "emergency_contacts_user_created_idx")
+  @@map("emergency_contacts")
+}
+
+model RideLocationPing {
+  id                   String                                @id @default(uuid()) @db.Uuid
+  rideOfferId          String                                @map("ride_offer_id") @db.Uuid
+  userId               String                                @map("user_id") @db.Uuid
+  source               String                                @default("participant") @db.VarChar(32)
+  latitude             Decimal                               @db.Decimal(9, 6)
+  longitude            Decimal                               @db.Decimal(9, 6)
+  accuracyMeters       Decimal?                              @map("accuracy_meters") @db.Decimal(8, 2)
+  headingDegrees       Int?                                  @map("heading_degrees") @db.SmallInt
+  speedMetersPerSecond Decimal?                              @map("speed_meters_per_second") @db.Decimal(7, 2)
+  location             Unsupported("geography(Point,4326)")?
+  recordedAt           DateTime                              @map("recorded_at") @db.Timestamptz(3)
+  createdAt            DateTime                              @default(now()) @map("created_at") @db.Timestamptz(3)
+  rideOffer            RideOffer                             @relation(fields: [rideOfferId], references: [id], onDelete: Cascade)
+  user                 User                                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([rideOfferId, userId, recordedAt(sort: Desc)], map: "ride_location_pings_ride_user_recorded_idx")
+  @@map("ride_location_pings")
+}
+
+model RideShareLink {
+  id              String    @id @default(uuid()) @db.Uuid
+  rideOfferId     String    @map("ride_offer_id") @db.Uuid
+  createdByUserId String    @map("created_by_user_id") @db.Uuid
+  tokenDigest     String    @unique @map("token_digest") @db.Char(64)
+  label           String?   @db.VarChar(80)
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  rideOffer       RideOffer @relation(fields: [rideOfferId], references: [id], onDelete: Cascade)
+  createdBy       User      @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([createdByUserId, rideOfferId, createdAt(sort: Desc)], map: "ride_share_links_creator_ride_created_idx")
+  @@index([expiresAt], map: "ride_share_links_expiry_idx")
+  @@map("ride_share_links")
+}
+
+model SafetyAlert {
+  id                String       @id @default(uuid()) @db.Uuid
+  rideOfferId       String       @map("ride_offer_id") @db.Uuid
+  bookingId         String?      @map("booking_id") @db.Uuid
+  initiatedByUserId String       @map("initiated_by_user_id") @db.Uuid
+  clientAlertId     String       @map("client_alert_id") @db.Uuid
+  status            String       @default("ACTIVE") @db.VarChar(32)
+  latitude          Decimal      @db.Decimal(9, 6)
+  longitude         Decimal      @db.Decimal(9, 6)
+  accuracyMeters    Decimal?     @map("accuracy_meters") @db.Decimal(8, 2)
+  message           String?      @db.VarChar(500)
+  emergencyNumber   String       @default("112") @map("emergency_number") @db.VarChar(20)
+  resolvedAt        DateTime?    @map("resolved_at") @db.Timestamptz(3)
+  resolutionNote    String?      @map("resolution_note") @db.VarChar(500)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  rideOffer         RideOffer    @relation(fields: [rideOfferId], references: [id], onDelete: Cascade)
+  booking           RideBooking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  initiatedBy       User         @relation(fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([initiatedByUserId, clientAlertId], map: "safety_alerts_initiator_client_key")
+  @@index([initiatedByUserId, createdAt(sort: Desc)], map: "safety_alerts_initiator_created_idx")
+  @@index([rideOfferId, status, createdAt(sort: Desc)], map: "safety_alerts_ride_status_created_idx")
+  @@map("safety_alerts")
 }
