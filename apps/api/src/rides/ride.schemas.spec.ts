@@ -3,6 +3,7 @@ import {
   createRideSchema,
   rideRouteSchema,
   routePointSchema,
+  searchRidesSchema,
   updateRideSchema,
 } from "./ride.schemas.js";
 
@@ -59,5 +60,32 @@ describe("ride schemas", () => {
 
   it("rejects an empty ride patch", () => {
     expect(updateRideSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("coerces bounded proximity search parameters", () => {
+    const search = searchRidesSchema.parse({
+      originLatitude: "6.5095",
+      originLongitude: "3.3711",
+      destinationLatitude: "6.4541",
+      destinationLongitude: "3.3947",
+    });
+
+    expect(search).toMatchObject({
+      radiusMeters: 5_000,
+      seats: 1,
+      limit: 20,
+    });
+  });
+
+  it("rejects oversized ride searches", () => {
+    expect(
+      searchRidesSchema.safeParse({
+        originLatitude: "6.5095",
+        originLongitude: "3.3711",
+        destinationLatitude: "6.4541",
+        destinationLongitude: "3.3947",
+        radiusMeters: "50000",
+      }).success,
+    ).toBe(false);
   });
 });
