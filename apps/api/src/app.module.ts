@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuthModule } from "./auth/auth.module.js";
 import { BankModule } from "./bank/bank.module.js";
 import { BookingModule } from "./bookings/booking.module.js";
+import { ChatModule } from "./chat/chat.module.js";
 import { DriverModule } from "./driver/driver.module.js";
 import { HealthController } from "./health.controller.js";
 import { IdentityModule } from "./identity/identity.module.js";
@@ -22,6 +23,7 @@ import { UploadModule } from "./uploads/upload.module.js";
     BankModule,
     PaymentModule,
     BookingModule,
+    ChatModule,
     ProfileModule,
     DriverModule,
     UploadModule,
