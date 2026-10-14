@@ -94,6 +94,53 @@ enum PaymentStatus {
   @@map("payment_status")
 }
 
+enum RefundStatus {
+  REQUESTED
+  SUBMITTING
+  SUBMITTED
+  PROCESSING
+  NEEDS_ATTENTION
+  PROCESSED
+  FAILED
+
+  @@map("refund_status")
+}
+
+enum RefundKind {
+  PASSENGER_CANCELLATION
+  DRIVER_CANCELLATION
+  FULFILLMENT_FAILED
+
+  @@map("refund_kind")
+}
+
+enum LedgerJournalKind {
+  ESCROW_FUNDED
+  REFUND_RESERVED
+  REFUND_SETTLED
+  TRIP_SETTLED
+  PAYOUT_SETTLED
+
+  @@map("ledger_journal_kind")
+}
+
+enum LedgerAccount {
+  PLATFORM_CASH
+  PASSENGER_ESCROW
+  REFUND_PAYABLE
+  DRIVER_PAYABLE
+  PLATFORM_REVENUE
+
+  @@map("ledger_account")
+}
+
+enum LedgerDirection {
+  DEBIT
+  CREDIT
+
+  @@map("ledger_direction")
+}
+
 model User {
   id                String             @id @default(uuid()) @db.Uuid
   phoneE164         String             @unique @map("phone_e164") @db.VarChar(16)
@@ -106,6 +153,7 @@ model User {
   driverApplication DriverApplication?
   uploads           UploadAsset[]
   rideBookings      RideBooking[]
+  ledgerJournals    LedgerJournal[]
 
   @@map("users")
 }
@@ -302,6 +350,8 @@ model RideBooking {
   rideOffer             RideOffer            @relation(fields: [rideOfferId], references: [id], onDelete: Cascade)
   passenger             User                 @relation(fields: [passengerUserId], references: [id], onDelete: Cascade)
   payments              PaymentTransaction[]
+  refunds               PaymentRefund[]
+  ledgerJournals        LedgerJournal[]
 
   @@index([rideOfferId, status], map: "ride_bookings_offer_status_idx")
   @@index([passengerUserId, createdAt(sort: Desc)], map: "ride_bookings_passenger_created_idx")
@@ -329,8 +379,68 @@ model PaymentTransaction {
   createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt             DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
   booking               RideBooking     @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  refund                PaymentRefund?
+  ledgerJournals        LedgerJournal[]
 
   @@index([bookingId, status], map: "payment_transactions_booking_status_idx")
   @@index([status, createdAt], map: "payment_transactions_status_created_idx")
   @@map("payment_transactions")
+}
+
+model PaymentRefund {
+  id                     String             @id @default(uuid()) @db.Uuid
+  paymentId              String             @unique @map("payment_id") @db.Uuid
+  bookingId              String             @map("booking_id") @db.Uuid
+  kind                   RefundKind
+  status                 RefundStatus       @default(REQUESTED)
+  amountKobo             BigInt             @map("amount_kobo")
+  driverCompensationKobo BigInt             @map("driver_compensation_kobo")
+  currency               String             @db.Char(3)
+  reason                 String             @db.VarChar(280)
+  providerRefundId       String?            @unique @map("provider_refund_id") @db.VarChar(32)
+  providerMessage        String?            @map("provider_message") @db.VarChar(280)
+  submittedAt            DateTime?          @map("submitted_at") @db.Timestamptz(3)
+  processedAt            DateTime?          @map("processed_at") @db.Timestamptz(3)
+  failedAt               DateTime?          @map("failed_at") @db.Timestamptz(3)
+  createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  payment                PaymentTransaction @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  booking                RideBooking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  ledgerJournals         LedgerJournal[]
+
+  @@index([status, createdAt], map: "payment_refunds_status_created_idx")
+  @@map("payment_refunds")
+}
+
+model LedgerJournal {
+  id             String              @id @default(uuid()) @db.Uuid
+  bookingId      String              @map("booking_id") @db.Uuid
+  paymentId      String?             @map("payment_id") @db.Uuid
+  refundId       String?             @map("refund_id") @db.Uuid
+  userId         String?             @map("user_id") @db.Uuid
+  kind           LedgerJournalKind
+  idempotencyKey String              @unique @map("idempotency_key") @db.VarChar(160)
+  currency       String              @db.Char(3)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  booking        RideBooking         @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  payment        PaymentTransaction? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  refund         PaymentRefund?      @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  user           User?               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  entries        LedgerEntry[]
+
+  @@index([bookingId, createdAt], map: "ledger_journals_booking_created_idx")
+  @@map("ledger_journals")
+}
+
+model LedgerEntry {
+  id         String          @id @default(uuid()) @db.Uuid
+  journalId  String          @map("journal_id") @db.Uuid
+  account    LedgerAccount
+  direction  LedgerDirection
+  amountKobo BigInt          @map("amount_kobo")
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  journal    LedgerJournal   @relation(fields: [journalId], references: [id], onDelete: Restrict)
+
+  @@index([account, createdAt], map: "ledger_entries_account_created_idx")
+  @@map("ledger_entries")
 }
