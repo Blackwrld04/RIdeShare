@@ -3,6 +3,8 @@ import { Pool } from "pg";
 import { PrismaClient } from "./generated/prisma/client.js";
 
 export {
+  DriverApplicationStatus,
+  DriverDocumentStatus,
   Prisma,
   PrismaClient,
   UserStatus,

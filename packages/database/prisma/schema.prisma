@@ -16,15 +16,35 @@ enum UserStatus {
   @@map("user_status")
 }
 
+enum DriverApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  SUSPENDED
+
+  @@map("driver_application_status")
+}
+
+enum DriverDocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("driver_document_status")
+}
+
 model User {
-  id              String        @id @default(uuid()) @db.Uuid
-  phoneE164       String        @unique @map("phone_e164") @db.VarChar(16)
-  phoneVerifiedAt DateTime      @map("phone_verified_at") @db.Timestamptz(3)
-  status          UserStatus    @default(ACTIVE)
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
-  profile         UserProfile?
-  sessions        AuthSession[]
+  id                String             @id @default(uuid()) @db.Uuid
+  phoneE164         String             @unique @map("phone_e164") @db.VarChar(16)
+  phoneVerifiedAt   DateTime           @map("phone_verified_at") @db.Timestamptz(3)
+  status            UserStatus         @default(ACTIVE)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  profile           UserProfile?
+  sessions          AuthSession[]
+  driverApplication DriverApplication?
 
   @@map("users")
 }
@@ -68,4 +88,64 @@ model AuthSession {
   @@index([userId], map: "auth_sessions_user_idx")
   @@index([expiresAt], map: "auth_sessions_expires_idx")
   @@map("auth_sessions")
+}
+
+model DriverApplication {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  userId             String                  @unique @map("user_id") @db.Uuid
+  status             DriverApplicationStatus @default(DRAFT)
+  legalFirstName     String?                 @map("legal_first_name") @db.VarChar(80)
+  legalLastName      String?                 @map("legal_last_name") @db.VarChar(80)
+  dateOfBirth        DateTime?               @map("date_of_birth") @db.Date
+  residentialAddress String?                 @map("residential_address") @db.VarChar(160)
+  city               String?                 @db.VarChar(80)
+  state              String?                 @db.VarChar(80)
+  submittedAt        DateTime?               @map("submitted_at") @db.Timestamptz(3)
+  reviewedAt         DateTime?               @map("reviewed_at") @db.Timestamptz(3)
+  decisionReason     String?                 @map("decision_reason") @db.VarChar(500)
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle            DriverVehicle?
+  documents          DriverDocument[]
+
+  @@index([status, submittedAt], map: "driver_applications_status_submitted_idx")
+  @@map("driver_applications")
+}
+
+model DriverVehicle {
+  id                  String            @id @default(uuid()) @db.Uuid
+  driverApplicationId String            @unique @map("driver_application_id") @db.Uuid
+  make                String            @db.VarChar(80)
+  model               String            @db.VarChar(80)
+  color               String            @db.VarChar(40)
+  year                Int               @db.SmallInt
+  registrationNumber  String            @unique @map("registration_number") @db.VarChar(20)
+  seatCapacity        Int               @map("seat_capacity") @db.SmallInt
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  application         DriverApplication @relation(fields: [driverApplicationId], references: [id], onDelete: Cascade)
+
+  @@map("driver_vehicles")
+}
+
+model DriverDocument {
+  id                  String               @id @default(uuid()) @db.Uuid
+  driverApplicationId String               @map("driver_application_id") @db.Uuid
+  kind                String               @db.VarChar(64)
+  storageKey          String               @map("storage_key") @db.VarChar(512)
+  contentType         String               @map("content_type") @db.VarChar(100)
+  sizeBytes           BigInt               @map("size_bytes")
+  checksumSha256      String               @map("checksum_sha256") @db.Char(64)
+  issuedOn            DateTime?            @map("issued_on") @db.Date
+  expiresOn           DateTime?            @map("expires_on") @db.Date
+  status              DriverDocumentStatus @default(PENDING)
+  rejectionReason     String?              @map("rejection_reason") @db.VarChar(500)
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  application         DriverApplication    @relation(fields: [driverApplicationId], references: [id], onDelete: Cascade)
+
+  @@unique([driverApplicationId, kind], map: "driver_documents_application_kind_key")
+  @@index([status], map: "driver_documents_status_idx")
+  @@map("driver_documents")
 }
