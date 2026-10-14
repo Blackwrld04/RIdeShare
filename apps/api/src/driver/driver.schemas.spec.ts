@@ -32,10 +32,7 @@ describe("driver schemas", () => {
 
   it("rejects invalid document metadata", () => {
     const result = upsertDriverDocumentSchema.safeParse({
-      storageKey: "drivers/../another-user/file.pdf",
-      contentType: "application/pdf",
-      sizeBytes: 1024,
-      checksumSha256: "a".repeat(64),
+      uploadId: "not-an-upload-id",
       issuedOn: "2026-10-14",
       expiresOn: "2026-10-13",
     });

@@ -9,6 +9,9 @@ const requiredEnvironment = {
   AUTH_REFRESH_TOKEN_SECRET: "c".repeat(32),
   OTP_HMAC_SECRET: "b".repeat(32),
   OTP_DEV_CODE: "000000",
+  STORAGE_BUCKET: "commuteshare-private",
+  STORAGE_ACCESS_KEY_ID: "commuteshare",
+  STORAGE_SECRET_ACCESS_KEY: "commuteshare-local-secret",
 };
 
 describe("loadConfig", () => {
@@ -34,6 +37,13 @@ describe("loadConfig", () => {
       SMS_PROVIDER: "console",
       TERMII_BASE_URL: "https://api.ng.termii.com",
       TERMII_SENDER_ID: "CommuteNG",
+      STORAGE_REGION: "us-east-1",
+      STORAGE_BUCKET: "commuteshare-private",
+      STORAGE_ACCESS_KEY_ID: "commuteshare",
+      STORAGE_SECRET_ACCESS_KEY: "commuteshare-local-secret",
+      STORAGE_FORCE_PATH_STYLE: false,
+      UPLOAD_URL_TTL_SECONDS: 900,
+      UPLOAD_MAX_BYTES: 10_485_760,
     });
   });
 
@@ -57,5 +67,16 @@ describe("loadConfig", () => {
     expect(() =>
       loadConfig({ ...requiredEnvironment, SMS_PROVIDER: "termii" }),
     ).toThrow("TERMII_API_KEY");
+  });
+
+  it("coerces storage flags and upload limits", () => {
+    const config = loadConfig({
+      ...requiredEnvironment,
+      STORAGE_FORCE_PATH_STYLE: "true",
+      UPLOAD_MAX_BYTES: "2097152",
+    });
+
+    expect(config.STORAGE_FORCE_PATH_STYLE).toBe(true);
+    expect(config.UPLOAD_MAX_BYTES).toBe(2_097_152);
   });
 });

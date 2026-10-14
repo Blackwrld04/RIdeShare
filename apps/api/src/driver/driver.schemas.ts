@@ -45,25 +45,7 @@ export const driverDocumentKindSchema = z
 
 export const upsertDriverDocumentSchema = z
   .object({
-    storageKey: z
-      .string()
-      .trim()
-      .min(1)
-      .max(512)
-      .regex(/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/)
-      .refine((value) => !value.split("/").includes(".."), {
-        message: "Storage key cannot contain parent segments",
-      }),
-    contentType: z.enum(["application/pdf", "image/jpeg", "image/png"]),
-    sizeBytes: z
-      .number()
-      .int()
-      .positive()
-      .max(10 * 1024 * 1024),
-    checksumSha256: z
-      .string()
-      .regex(/^[a-fA-F0-9]{64}$/)
-      .transform((value) => value.toLowerCase()),
+    uploadId: z.uuid(),
     issuedOn: dateOnlySchema.optional(),
     expiresOn: dateOnlySchema.optional(),
   })

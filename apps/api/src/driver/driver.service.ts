@@ -2,6 +2,7 @@ import {
   DriverApplicationStatus,
   DriverDocumentStatus,
   type Prisma,
+  UploadStatus,
 } from "@commuteshare/database";
 import {
   BadRequestException,
@@ -13,7 +14,6 @@ import {
 import { DatabaseService } from "../infrastructure/database.service.js";
 import {
   getDriverSubmissionIssues,
-  isDriverStorageKeyOwnedBy,
   REQUIRED_DRIVER_DOCUMENT_KINDS,
 } from "./driver.policy.js";
 import type {
@@ -31,6 +31,8 @@ const applicationInclude = {
 type DriverApplicationRecord = Prisma.DriverApplicationGetPayload<{
   include: typeof applicationInclude;
 }>;
+
+type UploadAssetRecord = Prisma.UploadAssetGetPayload<Record<string, never>>;
 
 export interface DriverApplicationResponse {
   id: string;
@@ -54,6 +56,7 @@ export interface DriverApplicationResponse {
   } | null;
   documents: Array<{
     id: string;
+    uploadId: string | null;
     kind: string;
     contentType: string;
     sizeBytes: number;
@@ -158,14 +161,34 @@ export class DriverService {
     const application = await this.requireApplication(userId);
     this.assertEditable(application.status);
 
-    if (!isDriverStorageKeyOwnedBy(userId, input.storageKey)) {
-      throw new BadRequestException(
-        "Document storage key is not owned by user",
-      );
-    }
-
     await this.database.client.$transaction(async (transaction) => {
       await this.claimEditable(transaction, application.id);
+      const asset = await transaction.uploadAsset.findFirst({
+        where: {
+          id: input.uploadId,
+          ownerUserId: userId,
+          purpose: "driver_document",
+          status: UploadStatus.READY,
+        },
+      });
+
+      if (!asset) {
+        throw new BadRequestException("Upload is not ready for attachment");
+      }
+
+      const attachment = await transaction.driverDocument.findUnique({
+        where: { assetId: asset.id },
+        select: { driverApplicationId: true, kind: true },
+      });
+
+      if (
+        attachment &&
+        (attachment.driverApplicationId !== application.id ||
+          attachment.kind !== kind)
+      ) {
+        throw new ConflictException("Upload is already attached to a document");
+      }
+
       await transaction.driverDocument.upsert({
         where: {
           driverApplicationId_kind: {
@@ -176,10 +199,10 @@ export class DriverService {
         create: {
           driverApplicationId: application.id,
           kind,
-          ...this.documentData(input),
+          ...this.documentData(asset, input),
         },
         update: {
-          ...this.documentData(input),
+          ...this.documentData(asset, input),
           status: DriverDocumentStatus.PENDING,
           rejectionReason: null,
         },
@@ -335,6 +358,7 @@ export class DriverService {
         : null,
       documents: application.documents.map((document) => ({
         id: document.id,
+        uploadId: document.assetId,
         kind: document.kind,
         contentType: document.contentType,
         sizeBytes: Number(document.sizeBytes),
@@ -355,12 +379,16 @@ export class DriverService {
     };
   }
 
-  private documentData(input: UpsertDriverDocumentInput) {
+  private documentData(
+    asset: UploadAssetRecord,
+    input: UpsertDriverDocumentInput,
+  ) {
     return {
-      storageKey: input.storageKey,
-      contentType: input.contentType,
-      sizeBytes: BigInt(input.sizeBytes),
-      checksumSha256: input.checksumSha256,
+      assetId: asset.id,
+      storageKey: asset.objectKey,
+      contentType: asset.contentType,
+      sizeBytes: asset.sizeBytes,
+      checksumSha256: asset.checksumSha256,
       issuedOn: input.issuedOn ? this.toDate(input.issuedOn) : null,
       expiresOn: input.expiresOn ? this.toDate(input.expiresOn) : null,
     };
