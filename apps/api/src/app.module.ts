@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "./auth/auth.module.js";
+import { BookingModule } from "./bookings/booking.module.js";
 import { DriverModule } from "./driver/driver.module.js";
 import { HealthController } from "./health.controller.js";
 import { InfrastructureModule } from "./infrastructure/infrastructure.module.js";
@@ -11,6 +12,7 @@ import { UploadModule } from "./uploads/upload.module.js";
   imports: [
     InfrastructureModule,
     AuthModule,
+    BookingModule,
     ProfileModule,
     DriverModule,
     UploadModule,

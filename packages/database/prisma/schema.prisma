@@ -269,6 +269,7 @@ model RideBooking {
   totalContributionKobo BigInt        @map("total_contribution_kobo")
   currency              String        @db.Char(3)
   decidedAt             DateTime?     @map("decided_at") @db.Timestamptz(3)
+  decisionReason        String?       @map("decision_reason") @db.VarChar(280)
   cancelledAt           DateTime?     @map("cancelled_at") @db.Timestamptz(3)
   cancellationReason    String?       @map("cancellation_reason") @db.VarChar(280)
   createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)

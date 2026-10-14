@@ -16,6 +16,7 @@ CREATE TABLE ride_bookings (
   total_contribution_kobo BIGINT NOT NULL,
   currency CHAR(3) NOT NULL,
   decided_at TIMESTAMPTZ(3),
+  decision_reason VARCHAR(280),
   cancelled_at TIMESTAMPTZ(3),
   cancellation_reason VARCHAR(280),
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
