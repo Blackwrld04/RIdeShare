@@ -67,6 +67,8 @@ enum RidePointKind {
 enum BookingStatus {
   PENDING
   CONFIRMED
+  IN_PROGRESS
+  COMPLETED
   DECLINED
   CANCELLED
   EXPIRED
@@ -226,6 +228,8 @@ model RideOffer {
   currency            String            @default("NGN") @db.Char(3)
   notes               String?           @db.VarChar(280)
   publishedAt         DateTime?         @map("published_at") @db.Timestamptz(3)
+  startedAt           DateTime?         @map("started_at") @db.Timestamptz(3)
+  completedAt         DateTime?         @map("completed_at") @db.Timestamptz(3)
   cancelledAt         DateTime?         @map("cancelled_at") @db.Timestamptz(3)
   cancellationReason  String?           @map("cancellation_reason") @db.VarChar(280)
   createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -270,6 +274,8 @@ model RideBooking {
   currency              String        @db.Char(3)
   decidedAt             DateTime?     @map("decided_at") @db.Timestamptz(3)
   decisionReason        String?       @map("decision_reason") @db.VarChar(280)
+  startedAt             DateTime?     @map("started_at") @db.Timestamptz(3)
+  completedAt           DateTime?     @map("completed_at") @db.Timestamptz(3)
   cancelledAt           DateTime?     @map("cancelled_at") @db.Timestamptz(3)
   cancellationReason    String?       @map("cancellation_reason") @db.VarChar(280)
   createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Inject,
   Param,
   Patch,
@@ -89,5 +90,23 @@ export class RideController {
     @Body(new ZodValidationPipe(cancelRideSchema)) input: CancelRideInput,
   ): Promise<RideOfferResponse> {
     return this.rides.cancel(request.auth.userId, rideId, input);
+  }
+
+  @Post(":rideId/start")
+  @HttpCode(200)
+  start(
+    @Req() request: AuthenticatedRequest,
+    @Param("rideId", new ZodValidationPipe(rideIdSchema)) rideId: string,
+  ): Promise<RideOfferResponse> {
+    return this.rides.start(request.auth.userId, rideId);
+  }
+
+  @Post(":rideId/complete")
+  @HttpCode(200)
+  complete(
+    @Req() request: AuthenticatedRequest,
+    @Param("rideId", new ZodValidationPipe(rideIdSchema)) rideId: string,
+  ): Promise<RideOfferResponse> {
+    return this.rides.complete(request.auth.userId, rideId);
   }
 }

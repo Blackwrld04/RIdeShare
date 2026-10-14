@@ -6,6 +6,7 @@ import { HealthController } from "./health.controller.js";
 import { InfrastructureModule } from "./infrastructure/infrastructure.module.js";
 import { ProfileModule } from "./profiles/profile.module.js";
 import { RideModule } from "./rides/ride.module.js";
+import { TripModule } from "./trips/trip.module.js";
 import { UploadModule } from "./uploads/upload.module.js";
 
 @Module({
@@ -17,6 +18,7 @@ import { UploadModule } from "./uploads/upload.module.js";
     DriverModule,
     UploadModule,
     RideModule,
+    TripModule,
   ],
   controllers: [HealthController],
 })

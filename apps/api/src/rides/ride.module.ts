@@ -7,5 +7,6 @@ import { RideService } from "./ride.service.js";
   imports: [AuthModule],
   controllers: [RideController],
   providers: [RideService],
+  exports: [RideService],
 })
 export class RideModule {}
