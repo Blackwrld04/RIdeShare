@@ -10,6 +10,9 @@ const config = loadConfig({
   OTP_HMAC_SECRET: "c".repeat(32),
   SMS_PROVIDER: "termii",
   TERMII_API_KEY: "termii-key",
+  STORAGE_BUCKET: "commuteshare-private",
+  STORAGE_ACCESS_KEY_ID: "commuteshare",
+  STORAGE_SECRET_ACCESS_KEY: "commuteshare-local-secret",
 });
 
 describe("TermiiOtpDelivery", () => {

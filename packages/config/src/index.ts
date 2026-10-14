@@ -58,6 +58,30 @@ const environmentSchema = z
       z.string().min(1).optional(),
     ),
     TERMII_SENDER_ID: z.string().min(3).max(11).default("CommuteNG"),
+    STORAGE_ENDPOINT: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.string().url().optional(),
+    ),
+    STORAGE_REGION: z.string().min(1).default("us-east-1"),
+    STORAGE_BUCKET: z.string().min(3).max(63),
+    STORAGE_ACCESS_KEY_ID: z.string().min(3),
+    STORAGE_SECRET_ACCESS_KEY: z.string().min(8),
+    STORAGE_FORCE_PATH_STYLE: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+    UPLOAD_URL_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(3_600)
+      .default(900),
+    UPLOAD_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1_048_576)
+      .max(52_428_800)
+      .default(10_485_760),
   })
   .superRefine((config, context) => {
     if (config.SMS_PROVIDER === "termii" && !config.TERMII_API_KEY) {
