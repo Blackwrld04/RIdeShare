@@ -27,6 +27,21 @@ describe("booking schemas", () => {
     ).toBe(false);
   });
 
+  it("accepts a bounded corridor journey", () => {
+    expect(
+      createBookingSchema.parse({
+        rideId: "b9cf2712-53a9-4a66-a6a6-92d319450138",
+        seats: 1,
+        journey: {
+          pickupLatitude: 6.5095,
+          pickupLongitude: 3.3711,
+          dropoffLatitude: 6.4541,
+          dropoffLongitude: 3.3947,
+        },
+      }).journey,
+    ).toMatchObject({ corridorRadiusMeters: 5_000 });
+  });
+
   it.each([declineBookingSchema, cancelBookingSchema])(
     "requires a meaningful release reason",
     (schema) => {
