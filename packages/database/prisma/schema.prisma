@@ -64,6 +64,16 @@ enum RidePointKind {
   @@map("ride_point_kind")
 }
 
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+  CANCELLED
+  EXPIRED
+
+  @@map("booking_status")
+}
+
 model User {
   id                String             @id @default(uuid()) @db.Uuid
   phoneE164         String             @unique @map("phone_e164") @db.VarChar(16)
@@ -75,6 +85,7 @@ model User {
   sessions          AuthSession[]
   driverApplication DriverApplication?
   uploads           UploadAsset[]
+  rideBookings      RideBooking[]
 
   @@map("users")
 }
@@ -221,6 +232,7 @@ model RideOffer {
   updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
   driverApplication   DriverApplication @relation(fields: [driverApplicationId], references: [id], onDelete: Cascade)
   routePoints         RideRoutePoint[]
+  bookings            RideBooking[]
 
   @@index([driverApplicationId, departureAt(sort: Desc)], map: "ride_offers_driver_departure_idx")
   @@index([status, departureAt], map: "ride_offers_status_departure_idx")
@@ -245,4 +257,26 @@ model RideRoutePoint {
   @@unique([rideOfferId, sequence], map: "ride_route_points_offer_sequence_key")
   @@index([rideOfferId, kind], map: "ride_route_points_offer_kind_idx")
   @@map("ride_route_points")
+}
+
+model RideBooking {
+  id                    String        @id @default(uuid()) @db.Uuid
+  rideOfferId           String        @map("ride_offer_id") @db.Uuid
+  passengerUserId       String        @map("passenger_user_id") @db.Uuid
+  seats                 Int           @db.SmallInt
+  status                BookingStatus @default(PENDING)
+  unitContributionKobo  BigInt        @map("unit_contribution_kobo")
+  totalContributionKobo BigInt        @map("total_contribution_kobo")
+  currency              String        @db.Char(3)
+  decidedAt             DateTime?     @map("decided_at") @db.Timestamptz(3)
+  cancelledAt           DateTime?     @map("cancelled_at") @db.Timestamptz(3)
+  cancellationReason    String?       @map("cancellation_reason") @db.VarChar(280)
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  rideOffer             RideOffer     @relation(fields: [rideOfferId], references: [id], onDelete: Cascade)
+  passenger             User          @relation(fields: [passengerUserId], references: [id], onDelete: Cascade)
+
+  @@index([rideOfferId, status], map: "ride_bookings_offer_status_idx")
+  @@index([passengerUserId, createdAt(sort: Desc)], map: "ride_bookings_passenger_created_idx")
+  @@map("ride_bookings")
 }
