@@ -341,26 +341,32 @@ model UploadAsset {
 }
 
 model RideOffer {
-  id                  String            @id @default(uuid()) @db.Uuid
-  driverApplicationId String            @map("driver_application_id") @db.Uuid
-  status              RideStatus        @default(DRAFT)
-  departureAt         DateTime          @map("departure_at") @db.Timestamptz(3)
-  timezone            String            @default("Africa/Lagos") @db.VarChar(64)
-  passengerSeats      Int               @map("passenger_seats") @db.SmallInt
-  contributionKobo    BigInt            @map("contribution_kobo")
-  currency            String            @default("NGN") @db.Char(3)
-  notes               String?           @db.VarChar(280)
-  publishedAt         DateTime?         @map("published_at") @db.Timestamptz(3)
-  startedAt           DateTime?         @map("started_at") @db.Timestamptz(3)
-  completedAt         DateTime?         @map("completed_at") @db.Timestamptz(3)
-  cancelledAt         DateTime?         @map("cancelled_at") @db.Timestamptz(3)
-  cancellationReason  String?           @map("cancellation_reason") @db.VarChar(280)
-  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
-  driverApplication   DriverApplication @relation(fields: [driverApplicationId], references: [id], onDelete: Cascade)
-  routePoints         RideRoutePoint[]
-  bookings            RideBooking[]
-  payout              DriverPayout?
+  id                   String                                    @id @default(uuid()) @db.Uuid
+  driverApplicationId  String                                    @map("driver_application_id") @db.Uuid
+  status               RideStatus                                @default(DRAFT)
+  departureAt          DateTime                                  @map("departure_at") @db.Timestamptz(3)
+  timezone             String                                    @default("Africa/Lagos") @db.VarChar(64)
+  passengerSeats       Int                                       @map("passenger_seats") @db.SmallInt
+  contributionKobo     BigInt                                    @map("contribution_kobo")
+  currency             String                                    @default("NGN") @db.Char(3)
+  routePath            Json?                                     @map("route_path") @db.JsonB
+  routeDistanceMeters  Int?                                      @map("route_distance_meters")
+  routeDurationSeconds Int?                                      @map("route_duration_seconds")
+  routingSource        String?                                   @map("routing_source") @db.VarChar(32)
+  routingProfile       String?                                   @map("routing_profile") @db.VarChar(32)
+  routeCorridor        Unsupported("geometry(LineString,4326)")? @map("route_corridor")
+  notes                String?                                   @db.VarChar(280)
+  publishedAt          DateTime?                                 @map("published_at") @db.Timestamptz(3)
+  startedAt            DateTime?                                 @map("started_at") @db.Timestamptz(3)
+  completedAt          DateTime?                                 @map("completed_at") @db.Timestamptz(3)
+  cancelledAt          DateTime?                                 @map("cancelled_at") @db.Timestamptz(3)
+  cancellationReason   String?                                   @map("cancellation_reason") @db.VarChar(280)
+  createdAt            DateTime                                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                                  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  driverApplication    DriverApplication                         @relation(fields: [driverApplicationId], references: [id], onDelete: Cascade)
+  routePoints          RideRoutePoint[]
+  bookings             RideBooking[]
+  payout               DriverPayout?
 
   @@index([driverApplicationId, departureAt(sort: Desc)], map: "ride_offers_driver_departure_idx")
   @@index([status, departureAt], map: "ride_offers_status_departure_idx")
@@ -396,6 +402,15 @@ model RideBooking {
   unitContributionKobo  BigInt               @map("unit_contribution_kobo")
   totalContributionKobo BigInt               @map("total_contribution_kobo")
   currency              String               @db.Char(3)
+  pickupLatitude        Decimal?             @map("pickup_latitude") @db.Decimal(9, 6)
+  pickupLongitude       Decimal?             @map("pickup_longitude") @db.Decimal(9, 6)
+  pickupRouteFraction   Decimal?             @map("pickup_route_fraction") @db.Decimal(9, 8)
+  pickupDistanceMeters  Int?                 @map("pickup_distance_meters")
+  dropoffLatitude       Decimal?             @map("dropoff_latitude") @db.Decimal(9, 6)
+  dropoffLongitude      Decimal?             @map("dropoff_longitude") @db.Decimal(9, 6)
+  dropoffRouteFraction  Decimal?             @map("dropoff_route_fraction") @db.Decimal(9, 8)
+  dropoffDistanceMeters Int?                 @map("dropoff_distance_meters")
+  segmentDistanceMeters Int?                 @map("segment_distance_meters")
   decidedAt             DateTime?            @map("decided_at") @db.Timestamptz(3)
   decisionReason        String?              @map("decision_reason") @db.VarChar(280)
   startedAt             DateTime?            @map("started_at") @db.Timestamptz(3)

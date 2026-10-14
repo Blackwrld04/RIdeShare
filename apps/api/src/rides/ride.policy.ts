@@ -8,6 +8,9 @@ export interface RidePublishSnapshot {
   bankAccountStatus: string | null;
   vehicleSeatCapacity: number | null;
   routePoints: Array<{ kind: string }>;
+  routePathPointCount: number;
+  routeDistanceMeters: number | null;
+  routeDurationSeconds: number | null;
 }
 
 export interface RoutePointData extends RoutePointInput {
@@ -71,5 +74,85 @@ export function getRidePublishIssues(
     issues.push("route.destination");
   }
 
+  if (
+    ride.routePathPointCount < 2 ||
+    !ride.routeDistanceMeters ||
+    !ride.routeDurationSeconds
+  ) {
+    issues.push("route.corridor");
+  }
+
   return issues;
+}
+
+export function isRouteGeometryAligned(
+  route: RideRouteInput,
+  toleranceMeters = 2_000,
+): boolean {
+  if (!route.path || route.path.length < 2) {
+    return true;
+  }
+
+  const requiredPoints = [route.origin, ...route.waypoints, route.destination];
+  const first = route.path[0];
+  const last = route.path.at(-1);
+
+  if (!first || !last) {
+    return false;
+  }
+
+  if (
+    distanceMeters(first, route.origin) > toleranceMeters ||
+    distanceMeters(last, route.destination) > toleranceMeters
+  ) {
+    return false;
+  }
+
+  return requiredPoints.every((point) =>
+    route.path?.some(
+      (pathPoint) => distanceMeters(pathPoint, point) <= toleranceMeters,
+    ),
+  );
+}
+
+export function calculateSegmentContribution(
+  fullContributionKobo: number,
+  pickupRouteFraction: number,
+  dropoffRouteFraction: number,
+  minimumContributionKobo: number,
+): number {
+  if (fullContributionKobo <= 0) {
+    return 0;
+  }
+
+  const fraction = Math.max(
+    0,
+    Math.min(1, dropoffRouteFraction - pickupRouteFraction),
+  );
+  const proportional = Math.ceil((fullContributionKobo * fraction) / 100) * 100;
+
+  return Math.min(
+    fullContributionKobo,
+    Math.max(minimumContributionKobo, proportional),
+  );
+}
+
+function distanceMeters(
+  first: { latitude: number; longitude: number },
+  second: { latitude: number; longitude: number },
+): number {
+  const radians = Math.PI / 180;
+  const latitudeDelta = (second.latitude - first.latitude) * radians;
+  const longitudeDelta = (second.longitude - first.longitude) * radians;
+  const firstLatitude = first.latitude * radians;
+  const secondLatitude = second.latitude * radians;
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(firstLatitude) *
+      Math.cos(secondLatitude) *
+      Math.sin(longitudeDelta / 2) ** 2;
+
+  return (
+    6_371_000 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+  );
 }

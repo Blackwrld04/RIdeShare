@@ -1,3 +1,4 @@
+import type { AppConfig } from "@commuteshare/config";
 import {
   BookingStatus,
   Prisma,
@@ -12,8 +13,10 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { APP_CONFIG } from "../config.provider.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
 import { PaymentService } from "../payments/payment.service.js";
+import { calculateSegmentContribution } from "../rides/ride.policy.js";
 import {
   ACTIVE_BOOKING_STATUSES,
   calculateAvailableSeats,
@@ -58,6 +61,17 @@ type BookingRecord = Prisma.RideBookingGetPayload<{
   include: typeof bookingInclude;
 }>;
 
+interface JourneyMatchRow {
+  pickupLatitude: number;
+  pickupLongitude: number;
+  pickupRouteFraction: number;
+  pickupDistanceMeters: number;
+  dropoffLatitude: number;
+  dropoffLongitude: number;
+  dropoffRouteFraction: number;
+  dropoffDistanceMeters: number;
+}
+
 export interface BookingResponse {
   id: string;
   status: string;
@@ -65,6 +79,21 @@ export interface BookingResponse {
   unitContributionKobo: number;
   totalContributionKobo: number;
   currency: string;
+  journey: {
+    pickup: {
+      latitude: number;
+      longitude: number;
+      routeFraction: number;
+      distanceToRouteMeters: number;
+    };
+    dropoff: {
+      latitude: number;
+      longitude: number;
+      routeFraction: number;
+      distanceToRouteMeters: number;
+    };
+    segmentDistanceMeters: number;
+  } | null;
   passenger: {
     displayName: string | null;
   };
@@ -106,6 +135,7 @@ export interface BookingResponse {
 @Injectable()
 export class BookingService {
   constructor(
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(PaymentService) private readonly payments: PaymentService,
   ) {}
@@ -181,15 +211,49 @@ export class BookingService {
             );
           }
 
+          const journey = input.journey
+            ? await this.matchJourney(
+                transaction,
+                ride.id,
+                ride.routeDistanceMeters,
+                input.journey,
+              )
+            : null;
+          const unitContributionKobo = journey
+            ? calculateSegmentContribution(
+                Number(ride.contributionKobo),
+                journey.pickupRouteFraction,
+                journey.dropoffRouteFraction,
+                this.config.MIN_SEGMENT_CONTRIBUTION_KOBO,
+              )
+            : Number(ride.contributionKobo);
+
           const booking = await transaction.rideBooking.create({
             data: {
               rideOfferId: ride.id,
               passengerUserId: userId,
               seats: input.seats,
-              unitContributionKobo: ride.contributionKobo,
+              unitContributionKobo: BigInt(unitContributionKobo),
               totalContributionKobo:
-                ride.contributionKobo * BigInt(input.seats),
+                BigInt(unitContributionKobo) * BigInt(input.seats),
               currency: ride.currency,
+              ...(journey
+                ? {
+                    pickupLatitude: journey.pickupLatitude,
+                    pickupLongitude: journey.pickupLongitude,
+                    pickupRouteFraction: journey.pickupRouteFraction,
+                    pickupDistanceMeters: Math.round(
+                      journey.pickupDistanceMeters,
+                    ),
+                    dropoffLatitude: journey.dropoffLatitude,
+                    dropoffLongitude: journey.dropoffLongitude,
+                    dropoffRouteFraction: journey.dropoffRouteFraction,
+                    dropoffDistanceMeters: Math.round(
+                      journey.dropoffDistanceMeters,
+                    ),
+                    segmentDistanceMeters: journey.segmentDistanceMeters,
+                  }
+                : {}),
             },
             select: { id: true },
           });
@@ -398,6 +462,92 @@ export class BookingService {
     );
   }
 
+  private async matchJourney(
+    transaction: Prisma.TransactionClient,
+    rideId: string,
+    routeDistanceMeters: number | null,
+    journey: NonNullable<CreateBookingInput["journey"]>,
+  ): Promise<JourneyMatchRow & { segmentDistanceMeters: number }> {
+    if (!routeDistanceMeters) {
+      throw new BadRequestException("Ride does not have a routable corridor");
+    }
+
+    const matches = await transaction.$queryRaw<JourneyMatchRow[]>(Prisma.sql`
+      WITH query_points AS (
+        SELECT
+          ST_SetSRID(
+            ST_MakePoint(${journey.pickupLongitude}, ${journey.pickupLatitude}),
+            4326
+          ) AS pickup,
+          ST_SetSRID(
+            ST_MakePoint(${journey.dropoffLongitude}, ${journey.dropoffLatitude}),
+            4326
+          ) AS dropoff
+      )
+      SELECT
+        ST_Y(ST_ClosestPoint(ride.route_corridor, query_points.pickup))
+          AS "pickupLatitude",
+        ST_X(ST_ClosestPoint(ride.route_corridor, query_points.pickup))
+          AS "pickupLongitude",
+        ST_LineLocatePoint(ride.route_corridor, query_points.pickup)
+          AS "pickupRouteFraction",
+        ST_Distance(
+          ride.route_corridor::geography,
+          query_points.pickup::geography
+        ) AS "pickupDistanceMeters",
+        ST_Y(ST_ClosestPoint(ride.route_corridor, query_points.dropoff))
+          AS "dropoffLatitude",
+        ST_X(ST_ClosestPoint(ride.route_corridor, query_points.dropoff))
+          AS "dropoffLongitude",
+        ST_LineLocatePoint(ride.route_corridor, query_points.dropoff)
+          AS "dropoffRouteFraction",
+        ST_Distance(
+          ride.route_corridor::geography,
+          query_points.dropoff::geography
+        ) AS "dropoffDistanceMeters"
+      FROM ride_offers AS ride
+      CROSS JOIN query_points
+      WHERE ride.id = ${rideId}::uuid
+        AND ride.route_corridor IS NOT NULL
+        AND ST_DWithin(
+          ride.route_corridor::geography,
+          query_points.pickup::geography,
+          ${journey.corridorRadiusMeters}
+        )
+        AND ST_DWithin(
+          ride.route_corridor::geography,
+          query_points.dropoff::geography,
+          ${journey.corridorRadiusMeters}
+        )
+        AND ST_LineLocatePoint(
+          ride.route_corridor,
+          query_points.pickup
+        ) < ST_LineLocatePoint(
+          ride.route_corridor,
+          query_points.dropoff
+        )
+      LIMIT 1
+    `);
+    const match = matches[0];
+
+    if (!match) {
+      throw new BadRequestException(
+        "Pickup and dropoff must follow the ride corridor",
+      );
+    }
+
+    return {
+      ...match,
+      segmentDistanceMeters: Math.max(
+        1,
+        Math.round(
+          routeDistanceMeters *
+            (match.dropoffRouteFraction - match.pickupRouteFraction),
+        ),
+      ),
+    };
+  }
+
   private async getBooking(bookingId: string): Promise<BookingResponse> {
     const booking = await this.database.client.rideBooking.findUnique({
       where: { id: bookingId },
@@ -419,6 +569,32 @@ export class BookingService {
       unitContributionKobo: Number(booking.unitContributionKobo),
       totalContributionKobo: Number(booking.totalContributionKobo),
       currency: booking.currency,
+      journey:
+        booking.pickupLatitude !== null &&
+        booking.pickupLongitude !== null &&
+        booking.pickupRouteFraction !== null &&
+        booking.pickupDistanceMeters !== null &&
+        booking.dropoffLatitude !== null &&
+        booking.dropoffLongitude !== null &&
+        booking.dropoffRouteFraction !== null &&
+        booking.dropoffDistanceMeters !== null &&
+        booking.segmentDistanceMeters !== null
+          ? {
+              pickup: {
+                latitude: Number(booking.pickupLatitude),
+                longitude: Number(booking.pickupLongitude),
+                routeFraction: Number(booking.pickupRouteFraction),
+                distanceToRouteMeters: booking.pickupDistanceMeters,
+              },
+              dropoff: {
+                latitude: Number(booking.dropoffLatitude),
+                longitude: Number(booking.dropoffLongitude),
+                routeFraction: Number(booking.dropoffRouteFraction),
+                distanceToRouteMeters: booking.dropoffDistanceMeters,
+              },
+              segmentDistanceMeters: booking.segmentDistanceMeters,
+            }
+          : null,
       passenger: {
         displayName: booking.passenger.profile?.displayName ?? null,
       },

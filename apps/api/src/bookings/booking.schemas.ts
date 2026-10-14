@@ -1,9 +1,20 @@
 import { z } from "zod";
 
+const journeySchema = z
+  .object({
+    pickupLatitude: z.number().min(-90).max(90),
+    pickupLongitude: z.number().min(-180).max(180),
+    dropoffLatitude: z.number().min(-90).max(90),
+    dropoffLongitude: z.number().min(-180).max(180),
+    corridorRadiusMeters: z.number().int().min(250).max(25_000).default(5_000),
+  })
+  .strict();
+
 export const createBookingSchema = z
   .object({
     rideId: z.uuid(),
     seats: z.number().int().min(1).max(7),
+    journey: journeySchema.optional(),
   })
   .strict();
 
