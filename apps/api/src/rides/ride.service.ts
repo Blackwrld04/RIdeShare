@@ -1,3 +1,4 @@
+import type { AppConfig } from "@commuteshare/config";
 import {
   BookingStatus,
   DriverApplicationStatus,
@@ -16,12 +17,15 @@ import {
   ACTIVE_BOOKING_STATUSES,
   calculateAvailableSeats,
 } from "../bookings/booking.policy.js";
+import { APP_CONFIG } from "../config.provider.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
 import { PaymentService } from "../payments/payment.service.js";
 import { canCompleteRide, canStartRide } from "../trips/trip.policy.js";
 import {
   buildRoutePoints,
+  calculateSegmentContribution,
   getRidePublishIssues,
+  isRouteGeometryAligned,
   type RoutePointData,
 } from "./ride.policy.js";
 import type {
@@ -60,6 +64,15 @@ type RideOfferRecord = Prisma.RideOfferGetPayload<{
   include: typeof rideInclude;
 }>;
 
+type RideRouteMetadata = Pick<
+  Prisma.RideOfferUncheckedCreateInput,
+  | "routePath"
+  | "routeDistanceMeters"
+  | "routeDurationSeconds"
+  | "routingSource"
+  | "routingProfile"
+>;
+
 export interface RideOfferResponse {
   id: string;
   status: string;
@@ -78,6 +91,11 @@ export interface RideOfferResponse {
   availableSeats: number;
   contributionKobo: number;
   currency: string;
+  routePath: Array<{ latitude: number; longitude: number }>;
+  routeDistanceMeters: number | null;
+  routeDurationSeconds: number | null;
+  routingSource: string | null;
+  routingProfile: string | null;
   notes: string | null;
   route: Array<{
     id: string;
@@ -102,17 +120,36 @@ export interface RideOfferResponse {
 export type RideSearchResult = RideOfferResponse & {
   originDistanceMeters: number;
   destinationDistanceMeters: number;
+  pickup: {
+    latitude: number;
+    longitude: number;
+    routeFraction: number;
+  };
+  dropoff: {
+    latitude: number;
+    longitude: number;
+    routeFraction: number;
+  };
+  segmentDistanceMeters: number;
+  segmentContributionKobo: number;
 };
 
 interface RideSearchRow {
   id: string;
   originDistanceMeters: number;
   destinationDistanceMeters: number;
+  pickupLatitude: number;
+  pickupLongitude: number;
+  pickupRouteFraction: number;
+  dropoffLatitude: number;
+  dropoffLongitude: number;
+  dropoffRouteFraction: number;
 }
 
 @Injectable()
 export class RideService {
   constructor(
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(PaymentService) private readonly payments: PaymentService,
   ) {}
@@ -123,24 +160,32 @@ export class RideService {
   ): Promise<RideOfferResponse> {
     const driver = await this.requireApprovedDriver(userId);
     this.assertSeatCapacity(input.passengerSeats, driver.vehicle.seatCapacity);
+    this.assertRouteGeometry(input.route);
     const routePoints = buildRoutePoints(input.route).map((point) =>
       this.routePointData(point),
     );
-    const ride = await this.database.client.rideOffer.create({
-      data: {
-        driverApplicationId: driver.id,
-        departureAt: new Date(input.departureAt),
-        timezone: input.timezone,
-        passengerSeats: input.passengerSeats,
-        contributionKobo: BigInt(input.contributionKobo),
-        currency: input.currency,
-        ...(input.notes !== undefined ? { notes: input.notes } : {}),
-        routePoints: { create: routePoints },
+    const rideId = await this.database.client.$transaction(
+      async (transaction) => {
+        const ride = await transaction.rideOffer.create({
+          data: {
+            driverApplicationId: driver.id,
+            departureAt: new Date(input.departureAt),
+            timezone: input.timezone,
+            passengerSeats: input.passengerSeats,
+            contributionKobo: BigInt(input.contributionKobo),
+            currency: input.currency,
+            ...this.routeMetadata(input.route),
+            ...(input.notes !== undefined ? { notes: input.notes } : {}),
+            routePoints: { create: routePoints },
+          },
+          select: { id: true },
+        });
+        await this.syncRouteCorridor(transaction, ride.id, input.route.path);
+        return ride.id;
       },
-      include: rideInclude,
-    });
+    );
 
-    return this.toResponse(ride);
+    return this.get(userId, rideId);
   }
 
   async getMine(
@@ -197,34 +242,54 @@ export class RideService {
 
     const matches = await this.database.client.$queryRaw<RideSearchRow[]>(
       Prisma.sql`
-        WITH matching_rides AS (
+        WITH query_points AS (
+          SELECT
+            ST_SetSRID(
+              ST_MakePoint(${input.originLongitude}, ${input.originLatitude}),
+              4326
+            ) AS origin,
+            ST_SetSRID(
+              ST_MakePoint(
+                ${input.destinationLongitude},
+                ${input.destinationLatitude}
+              ),
+              4326
+            ) AS destination
+        ),
+        matching_rides AS (
           SELECT
             ride.id,
             ride.departure_at AS "departureAt",
             ST_Distance(
-              origin.location,
-              ST_SetSRID(
-                ST_MakePoint(${input.originLongitude}, ${input.originLatitude}),
-                4326
-              )::geography
+              ride.route_corridor::geography,
+              query_points.origin::geography
             ) AS "originDistanceMeters",
             ST_Distance(
-              destination.location,
-              ST_SetSRID(
-                ST_MakePoint(
-                  ${input.destinationLongitude},
-                  ${input.destinationLatitude}
-                ),
-                4326
-              )::geography
-            ) AS "destinationDistanceMeters"
+              ride.route_corridor::geography,
+              query_points.destination::geography
+            ) AS "destinationDistanceMeters",
+            ST_Y(
+              ST_ClosestPoint(ride.route_corridor, query_points.origin)
+            ) AS "pickupLatitude",
+            ST_X(
+              ST_ClosestPoint(ride.route_corridor, query_points.origin)
+            ) AS "pickupLongitude",
+            ST_LineLocatePoint(
+              ride.route_corridor,
+              query_points.origin
+            ) AS "pickupRouteFraction",
+            ST_Y(
+              ST_ClosestPoint(ride.route_corridor, query_points.destination)
+            ) AS "dropoffLatitude",
+            ST_X(
+              ST_ClosestPoint(ride.route_corridor, query_points.destination)
+            ) AS "dropoffLongitude",
+            ST_LineLocatePoint(
+              ride.route_corridor,
+              query_points.destination
+            ) AS "dropoffRouteFraction"
           FROM ride_offers AS ride
-          INNER JOIN ride_route_points AS origin
-            ON origin.ride_offer_id = ride.id
-            AND origin.kind = 'ORIGIN'::ride_point_kind
-          INNER JOIN ride_route_points AS destination
-            ON destination.ride_offer_id = ride.id
-            AND destination.kind = 'DESTINATION'::ride_point_kind
+          CROSS JOIN query_points
           LEFT JOIN (
             SELECT ride_offer_id, SUM(seats) AS reserved_seats
             FROM ride_bookings
@@ -237,6 +302,8 @@ export class RideService {
           ) AS reservations
             ON reservations.ride_offer_id = ride.id
           WHERE ride.status = 'PUBLISHED'::ride_status
+            AND ride.route_corridor IS NOT NULL
+            AND ride.route_distance_meters IS NOT NULL
             AND ride.departure_at >= ${departureFrom}
             AND ride.departure_at <= ${departureTo}
             AND ride.passenger_seats - COALESCE(
@@ -244,26 +311,33 @@ export class RideService {
               0
             ) >= ${input.seats}
             AND ST_DWithin(
-              origin.location,
-              ST_SetSRID(
-                ST_MakePoint(${input.originLongitude}, ${input.originLatitude}),
-                4326
-              )::geography,
+              ride.route_corridor::geography,
+              query_points.origin::geography,
               ${input.radiusMeters}
             )
             AND ST_DWithin(
-              destination.location,
-              ST_SetSRID(
-                ST_MakePoint(
-                  ${input.destinationLongitude},
-                  ${input.destinationLatitude}
-                ),
-                4326
-              )::geography,
+              ride.route_corridor::geography,
+              query_points.destination::geography,
               ${input.radiusMeters}
             )
+            AND ST_LineLocatePoint(
+              ride.route_corridor,
+              query_points.origin
+            ) < ST_LineLocatePoint(
+              ride.route_corridor,
+              query_points.destination
+            )
         )
-        SELECT id, "originDistanceMeters", "destinationDistanceMeters"
+        SELECT
+          id,
+          "originDistanceMeters",
+          "destinationDistanceMeters",
+          "pickupLatitude",
+          "pickupLongitude",
+          "pickupRouteFraction",
+          "dropoffLatitude",
+          "dropoffLongitude",
+          "dropoffRouteFraction"
         FROM matching_rides
         ORDER BY
           "departureAt" ASC,
@@ -293,6 +367,27 @@ export class RideService {
               destinationDistanceMeters: Math.round(
                 match.destinationDistanceMeters,
               ),
+              pickup: {
+                latitude: match.pickupLatitude,
+                longitude: match.pickupLongitude,
+                routeFraction: match.pickupRouteFraction,
+              },
+              dropoff: {
+                latitude: match.dropoffLatitude,
+                longitude: match.dropoffLongitude,
+                routeFraction: match.dropoffRouteFraction,
+              },
+              segmentDistanceMeters: this.segmentDistance(
+                ride.routeDistanceMeters,
+                match.pickupRouteFraction,
+                match.dropoffRouteFraction,
+              ),
+              segmentContributionKobo: calculateSegmentContribution(
+                Number(ride.contributionKobo),
+                match.pickupRouteFraction,
+                match.dropoffRouteFraction,
+                this.config.MIN_SEGMENT_CONTRIBUTION_KOBO,
+              ),
             },
           ]
         : [];
@@ -311,6 +406,9 @@ export class RideService {
       input.passengerSeats ?? ride.passengerSeats,
       ride.driverApplication.vehicle?.seatCapacity ?? null,
     );
+    if (input.route) {
+      this.assertRouteGeometry(input.route);
+    }
     const data: Prisma.RideOfferUpdateInput = {};
 
     if (input.departureAt !== undefined) {
@@ -327,6 +425,9 @@ export class RideService {
     }
     if (input.notes !== undefined) {
       data.notes = input.notes;
+    }
+    if (input.route) {
+      Object.assign(data, this.routeMetadata(input.route, true));
     }
 
     await this.database.client.$transaction(async (transaction) => {
@@ -349,6 +450,7 @@ export class RideService {
             ...this.routePointData(point),
           })),
         });
+        await this.syncRouteCorridor(transaction, ride.id, input.route.path);
       }
     });
 
@@ -379,6 +481,9 @@ export class RideService {
         vehicleSeatCapacity:
           current.driverApplication.vehicle?.seatCapacity ?? null,
         routePoints: current.routePoints,
+        routePathPointCount: this.routePath(current.routePath).length,
+        routeDistanceMeters: current.routeDistanceMeters,
+        routeDurationSeconds: current.routeDurationSeconds,
       });
 
       if (issues.length > 0) {
@@ -619,6 +724,14 @@ export class RideService {
     }
   }
 
+  private assertRouteGeometry(route: CreateRideInput["route"]): void {
+    if (!isRouteGeometryAligned(route)) {
+      throw new BadRequestException(
+        "Route path must follow the supplied origin, waypoints, and destination",
+      );
+    }
+  }
+
   private canView(userId: string, ride: RideOfferRecord): boolean {
     if (ride.driverApplication.userId === userId) {
       return true;
@@ -649,6 +762,96 @@ export class RideService {
     };
   }
 
+  private routeMetadata(
+    route: CreateRideInput["route"],
+    clearMissing = false,
+  ): RideRouteMetadata {
+    if (
+      !route.path ||
+      route.distanceMeters === undefined ||
+      route.durationSeconds === undefined
+    ) {
+      return clearMissing
+        ? {
+            routePath: Prisma.DbNull,
+            routeDistanceMeters: null,
+            routeDurationSeconds: null,
+            routingSource: null,
+            routingProfile: null,
+          }
+        : {};
+    }
+
+    return {
+      routePath: route.path as Prisma.InputJsonValue,
+      routeDistanceMeters: route.distanceMeters,
+      routeDurationSeconds: route.durationSeconds,
+      routingSource: route.routingSource ?? null,
+      routingProfile: route.routingProfile ?? null,
+    };
+  }
+
+  private async syncRouteCorridor(
+    transaction: Prisma.TransactionClient,
+    rideId: string,
+    path: CreateRideInput["route"]["path"],
+  ): Promise<void> {
+    if (!path) {
+      await transaction.$executeRaw(
+        Prisma.sql`UPDATE ride_offers SET route_corridor = NULL WHERE id = ${rideId}::uuid`,
+      );
+      return;
+    }
+
+    const geoJson = JSON.stringify({
+      type: "LineString",
+      coordinates: path.map((point) => [point.longitude, point.latitude]),
+    });
+    await transaction.$executeRaw(
+      Prisma.sql`
+        UPDATE ride_offers
+        SET route_corridor = ST_SetSRID(ST_GeomFromGeoJSON(${geoJson}), 4326)
+        WHERE id = ${rideId}::uuid
+      `,
+    );
+  }
+
+  private routePath(
+    value: Prisma.JsonValue | null,
+  ): Array<{ latitude: number; longitude: number }> {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.flatMap((point) => {
+      if (
+        typeof point !== "object" ||
+        point === null ||
+        Array.isArray(point) ||
+        typeof point.latitude !== "number" ||
+        typeof point.longitude !== "number"
+      ) {
+        return [];
+      }
+
+      return [{ latitude: point.latitude, longitude: point.longitude }];
+    });
+  }
+
+  private segmentDistance(
+    routeDistanceMeters: number | null,
+    pickupRouteFraction: number,
+    dropoffRouteFraction: number,
+  ): number {
+    return Math.max(
+      1,
+      Math.round(
+        (routeDistanceMeters ?? 0) *
+          (dropoffRouteFraction - pickupRouteFraction),
+      ),
+    );
+  }
+
   private toResponse(ride: RideOfferRecord): RideOfferResponse {
     return {
       id: ride.id,
@@ -675,6 +878,11 @@ export class RideService {
           : calculateAvailableSeats(ride.passengerSeats, ride.bookings),
       contributionKobo: Number(ride.contributionKobo),
       currency: ride.currency,
+      routePath: this.routePath(ride.routePath),
+      routeDistanceMeters: ride.routeDistanceMeters,
+      routeDurationSeconds: ride.routeDurationSeconds,
+      routingSource: ride.routingSource,
+      routingProfile: ride.routingProfile,
       notes: ride.notes,
       route: ride.routePoints.map((point) => ({
         id: point.id,

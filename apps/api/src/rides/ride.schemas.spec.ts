@@ -58,6 +58,40 @@ describe("ride schemas", () => {
     expect(ride.route.waypoints).toEqual([]);
   });
 
+  it("accepts provider-neutral route geometry for Leaflet clients", () => {
+    const route = rideRouteSchema.parse({
+      origin,
+      destination,
+      path: [
+        { latitude: 6.5095, longitude: 3.3711 },
+        { latitude: 6.4541, longitude: 3.3947 },
+      ],
+      distanceMeters: 8_200,
+      durationSeconds: 1_500,
+      routingSource: "osrm",
+      routingProfile: "driving",
+    });
+
+    expect(route).toMatchObject({
+      distanceMeters: 8_200,
+      durationSeconds: 1_500,
+      routingSource: "osrm",
+    });
+  });
+
+  it("rejects incomplete route geometry", () => {
+    expect(
+      rideRouteSchema.safeParse({
+        origin,
+        destination,
+        path: [
+          { latitude: 6.5095, longitude: 3.3711 },
+          { latitude: 6.4541, longitude: 3.3947 },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects an empty ride patch", () => {
     expect(updateRideSchema.safeParse({}).success).toBe(false);
   });

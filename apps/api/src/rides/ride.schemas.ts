@@ -24,11 +24,23 @@ export const routePointSchema = z
     },
   );
 
+export const routePathPointSchema = z
+  .object({
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+  })
+  .strict();
+
 export const rideRouteSchema = z
   .object({
     origin: routePointSchema,
     waypoints: z.array(routePointSchema).max(5).default([]),
     destination: routePointSchema,
+    path: z.array(routePathPointSchema).min(2).max(500).optional(),
+    distanceMeters: z.number().int().min(100).max(2_000_000).optional(),
+    durationSeconds: z.number().int().min(60).max(172_800).optional(),
+    routingSource: z.string().trim().min(2).max(32).optional(),
+    routingProfile: z.string().trim().min(2).max(32).optional(),
   })
   .strict()
   .refine(
@@ -37,6 +49,26 @@ export const rideRouteSchema = z
       route.origin.longitude !== route.destination.longitude,
     {
       message: "Origin and destination must be different",
+    },
+  )
+  .refine(
+    (route) =>
+      [route.path, route.distanceMeters, route.durationSeconds].every(
+        (value) => value !== undefined,
+      ) ||
+      [route.path, route.distanceMeters, route.durationSeconds].every(
+        (value) => value === undefined,
+      ),
+    {
+      message: "Route path, distance, and duration must be provided together",
+    },
+  )
+  .refine(
+    (route) =>
+      route.path !== undefined ||
+      (route.routingSource === undefined && route.routingProfile === undefined),
+    {
+      message: "Routing metadata requires a route path",
     },
   );
 
@@ -102,6 +134,7 @@ export const searchRidesSchema = z
   );
 
 export type RoutePointInput = z.infer<typeof routePointSchema>;
+export type RoutePathPointInput = z.infer<typeof routePathPointSchema>;
 export type RideRouteInput = z.infer<typeof rideRouteSchema>;
 export type CreateRideInput = z.infer<typeof createRideSchema>;
 export type UpdateRideInput = z.infer<typeof updateRideSchema>;
