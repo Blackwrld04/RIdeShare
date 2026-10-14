@@ -24,6 +24,12 @@ export interface DriverSubmissionSnapshot {
   state: string | null;
   vehicle: { id: string } | null;
   bankAccountStatus: string | null;
+  identityVerification: {
+    status: string;
+    legalFirstName: string;
+    legalLastName: string;
+    dateOfBirth: Date;
+  } | null;
   documents: Array<{
     kind: string;
     status: string;
@@ -64,6 +70,17 @@ export function getDriverSubmissionIssues(
     issues.push("bank_account");
   }
 
+  if (snapshot.identityVerification?.status !== "VERIFIED") {
+    issues.push("identity_verification");
+  } else if (
+    snapshot.legalFirstName &&
+    snapshot.legalLastName &&
+    snapshot.dateOfBirth &&
+    !identityDetailsMatch(snapshot)
+  ) {
+    issues.push("identity_verification.details_mismatch");
+  }
+
   const documents = new Map(
     snapshot.documents.map((document) => [document.kind, document]),
   );
@@ -91,6 +108,37 @@ export function getDriverSubmissionIssues(
   }
 
   return issues;
+}
+
+function identityDetailsMatch(snapshot: DriverSubmissionSnapshot): boolean {
+  const identity = snapshot.identityVerification;
+
+  if (
+    !identity ||
+    !snapshot.legalFirstName ||
+    !snapshot.legalLastName ||
+    !snapshot.dateOfBirth
+  ) {
+    return false;
+  }
+
+  return (
+    normalizeName(identity.legalFirstName) ===
+      normalizeName(snapshot.legalFirstName) &&
+    normalizeName(identity.legalLastName) ===
+      normalizeName(snapshot.legalLastName) &&
+    identity.dateOfBirth.toISOString().slice(0, 10) ===
+      snapshot.dateOfBirth.toISOString().slice(0, 10)
+  );
+}
+
+function normalizeName(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleUpperCase("en-NG");
 }
 
 function isAtLeastEighteen(dateOfBirth: Date, now: Date): boolean {
