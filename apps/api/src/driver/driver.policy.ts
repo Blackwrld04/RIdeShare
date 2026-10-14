@@ -88,13 +88,6 @@ export function getDriverSubmissionIssues(
   return issues;
 }
 
-export function isDriverStorageKeyOwnedBy(
-  userId: string,
-  storageKey: string,
-): boolean {
-  return storageKey.startsWith(`drivers/${userId}/`);
-}
-
 function isAtLeastEighteen(dateOfBirth: Date, now: Date): boolean {
   const cutoff = new Date(
     Date.UTC(now.getUTCFullYear() - 18, now.getUTCMonth(), now.getUTCDate()),

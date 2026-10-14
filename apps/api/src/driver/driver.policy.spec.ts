@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   type DriverSubmissionSnapshot,
   getDriverSubmissionIssues,
-  isDriverStorageKeyOwnedBy,
   REQUIRED_DRIVER_DOCUMENT_KINDS,
 } from "./driver.policy.js";
 
@@ -76,20 +75,5 @@ describe("driver submission policy", () => {
     expect(
       getDriverSubmissionIssues(snapshot, new Date("2026-10-14T12:00:00.000Z")),
     ).toContain("application.minimum_age");
-  });
-
-  it("binds storage keys to the authenticated driver", () => {
-    expect(
-      isDriverStorageKeyOwnedBy(
-        "9f0403a1-5970-4ad5-83b1-f345ce34ed76",
-        "drivers/9f0403a1-5970-4ad5-83b1-f345ce34ed76/license.pdf",
-      ),
-    ).toBe(true);
-    expect(
-      isDriverStorageKeyOwnedBy(
-        "9f0403a1-5970-4ad5-83b1-f345ce34ed76",
-        "drivers/cdb5818e-4b22-48d7-9c3b-952390ec3837/license.pdf",
-      ),
-    ).toBe(false);
   });
 });
