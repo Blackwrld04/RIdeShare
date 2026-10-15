@@ -43,6 +43,16 @@ const trustedProxySchema = z
       .filter(Boolean),
   );
 
+const clientIdsSchema = z
+  .string()
+  .default("")
+  .transform((value) =>
+    value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+  );
+
 export const PAYOUT_QUEUE_NAME = "driver-payouts";
 export const PROCESS_PAYOUT_JOB = "process-payout";
 export const RECONCILE_PAYOUTS_JOB = "reconcile-payouts";
@@ -123,6 +133,14 @@ const environmentSchema = z
       .min(1)
       .max(90)
       .default(30),
+    SOCIAL_AUTH_CHALLENGE_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(600)
+      .default(300),
+    GOOGLE_OIDC_CLIENT_IDS: clientIdsSchema,
+    APPLE_OIDC_CLIENT_IDS: clientIdsSchema,
     OTP_HMAC_SECRET: z.string().min(32),
     OTP_TTL_SECONDS: z.coerce.number().int().min(60).max(600).default(300),
     OTP_MAX_ATTEMPTS: z.coerce.number().int().min(3).max(10).default(5),
