@@ -116,8 +116,8 @@ export class HttpNinjaNinProvider extends NinProvider {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          client_key: this.config.NINJA_CLIENT_KEY,
-          client_secret: this.config.NINJA_CLIENT_SECRET,
+          client_key: this.config.NINJA_PUBLIC_KEY,
+          client_secret: this.config.NINJA_SECRET_KEY,
         }),
         signal: AbortSignal.timeout(10_000),
       },
