@@ -176,6 +176,15 @@ enum IdentityVerificationStatus {
   @@map("identity_verification_status")
 }
 
+enum PushDeliveryStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+
+  @@map("push_delivery_status")
+}
+
 enum RideSeriesStatus {
   ACTIVE
   PAUSED
@@ -200,6 +209,7 @@ model User {
   ledgerJournals       LedgerJournal[]
   identityVerification UserIdentityVerification?
   notifications        UserNotification[]
+  webPushSubscriptions WebPushSubscription[]
   chatMessages         ChatMessage[]             @relation("ChatMessageSender")
   chatReadReceipts     ChatReadReceipt[]
   emergencyContacts    EmergencyContact[]
@@ -661,19 +671,64 @@ model LedgerEntry {
 }
 
 model UserNotification {
-  id             String    @id @default(uuid()) @db.Uuid
-  userId         String    @map("user_id") @db.Uuid
-  kind           String    @db.VarChar(64)
-  title          String    @db.VarChar(120)
-  body           String    @db.VarChar(500)
-  data           Json?
-  idempotencyKey String    @unique @map("idempotency_key") @db.VarChar(180)
-  readAt         DateTime? @map("read_at") @db.Timestamptz(3)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String            @id @default(uuid()) @db.Uuid
+  userId            String            @map("user_id") @db.Uuid
+  kind              String            @db.VarChar(64)
+  title             String            @db.VarChar(120)
+  body              String            @db.VarChar(500)
+  data              Json?
+  idempotencyKey    String            @unique @map("idempotency_key") @db.VarChar(180)
+  readAt            DateTime?         @map("read_at") @db.Timestamptz(3)
+  pushPreparedAt    DateTime?         @map("push_prepared_at") @db.Timestamptz(3)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  webPushDeliveries WebPushDelivery[]
 
   @@index([userId, readAt, createdAt(sort: Desc)], map: "user_notifications_user_read_created_idx")
+  @@index([pushPreparedAt, createdAt], map: "user_notifications_push_prepared_created_idx")
   @@map("user_notifications")
+}
+
+model WebPushSubscription {
+  id             String            @id @default(uuid()) @db.Uuid
+  userId         String            @map("user_id") @db.Uuid
+  endpoint       String            @db.Text
+  endpointHash   String            @unique @map("endpoint_hash") @db.Char(64)
+  p256dh         String            @db.VarChar(256)
+  auth           String            @db.VarChar(128)
+  expirationAt   DateTime?         @map("expiration_at") @db.Timestamptz(3)
+  userAgent      String?           @map("user_agent") @db.VarChar(512)
+  enabled        Boolean           @default(true)
+  lastSeenAt     DateTime          @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  disabledAt     DateTime?         @map("disabled_at") @db.Timestamptz(3)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushDeliveries WebPushDelivery[]
+
+  @@index([userId, enabled], map: "web_push_subscriptions_user_enabled_idx")
+  @@map("web_push_subscriptions")
+}
+
+model WebPushDelivery {
+  id             String              @id @default(uuid()) @db.Uuid
+  notificationId String              @map("notification_id") @db.Uuid
+  subscriptionId String              @map("subscription_id") @db.Uuid
+  status         PushDeliveryStatus  @default(PENDING)
+  attemptCount   Int                 @default(0) @map("attempt_count")
+  nextAttemptAt  DateTime            @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  attemptedAt    DateTime?           @map("attempted_at") @db.Timestamptz(3)
+  sentAt         DateTime?           @map("sent_at") @db.Timestamptz(3)
+  failedAt       DateTime?           @map("failed_at") @db.Timestamptz(3)
+  lastError      String?             @map("last_error") @db.VarChar(500)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  notification   UserNotification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  subscription   WebPushSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, subscriptionId], map: "web_push_deliveries_notification_subscription_key")
+  @@index([status, nextAttemptAt], map: "web_push_deliveries_status_next_attempt_idx")
+  @@map("web_push_deliveries")
 }
 
 model ChatMessage {
