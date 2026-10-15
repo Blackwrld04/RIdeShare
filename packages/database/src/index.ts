@@ -16,6 +16,7 @@ export {
   PayoutStatus,
   Prisma,
   PrismaClient,
+  PushDeliveryStatus,
   RefundKind,
   RefundStatus,
   RidePointKind,

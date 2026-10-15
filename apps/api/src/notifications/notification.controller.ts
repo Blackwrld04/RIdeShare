@@ -1,7 +1,11 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
+  Headers,
   HttpCode,
+  HttpStatus,
   Inject,
   Param,
   Post,
@@ -18,11 +22,16 @@ import {
   type ListNotificationsInput,
   listNotificationsSchema,
   notificationIdSchema,
+  type RegisterWebPushSubscriptionInput,
+  registerWebPushSubscriptionSchema,
+  webPushSubscriptionIdSchema,
 } from "./notification.schemas.js";
 import {
   type NotificationListResponse,
   type NotificationResponse,
   NotificationService,
+  type WebPushConfigResponse,
+  type WebPushSubscriptionResponse,
 } from "./notification.service.js";
 
 @Controller("notifications")
@@ -32,6 +41,38 @@ export class NotificationController {
     @Inject(NotificationService)
     private readonly notifications: NotificationService,
   ) {}
+
+  @Get("push/config")
+  pushConfig(): WebPushConfigResponse {
+    return this.notifications.getWebPushConfig();
+  }
+
+  @Post("push/subscriptions")
+  registerWebPushSubscription(
+    @Req() request: AuthenticatedRequest,
+    @Headers("user-agent") userAgent: string | undefined,
+    @Body(new ZodValidationPipe(registerWebPushSubscriptionSchema))
+    input: RegisterWebPushSubscriptionInput,
+  ): Promise<WebPushSubscriptionResponse> {
+    return this.notifications.registerWebPushSubscription(
+      request.auth.userId,
+      input,
+      userAgent,
+    );
+  }
+
+  @Delete("push/subscriptions/:subscriptionId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  disableWebPushSubscription(
+    @Req() request: AuthenticatedRequest,
+    @Param("subscriptionId", new ZodValidationPipe(webPushSubscriptionIdSchema))
+    subscriptionId: string,
+  ): Promise<void> {
+    return this.notifications.disableWebPushSubscription(
+      request.auth.userId,
+      subscriptionId,
+    );
+  }
 
   @Get()
   list(
