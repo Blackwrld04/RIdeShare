@@ -26,6 +26,7 @@ import { APP_CONFIG } from "../config.provider.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
 import {
   calculateRefund,
+  disputeRefundReservedEntries,
   escrowFundedEntries,
   payoutReversedEntries,
   payoutSettledEntries,
@@ -361,6 +362,78 @@ export class PaymentService {
     }
   }
 
+  async removePayoutJob(payoutId: string): Promise<void> {
+    await this.payoutQueue.remove(payoutId);
+  }
+
+  async releaseHeldPayout(rideId: string): Promise<void> {
+    const payout = await this.database.client.$transaction(
+      async (transaction) => {
+        await transaction.$queryRaw(
+          Prisma.sql`SELECT id FROM driver_payouts WHERE ride_offer_id = ${rideId}::uuid FOR UPDATE`,
+        );
+        const openDisputes = await transaction.paymentDispute.count({
+          where: {
+            status: "OPEN",
+            booking: { rideOfferId: rideId },
+          },
+        });
+        if (openDisputes > 0) {
+          return null;
+        }
+        const current = await transaction.driverPayout.findUnique({
+          where: { rideOfferId: rideId },
+        });
+        if (!current || current.status !== PayoutStatus.ON_HOLD) {
+          return null;
+        }
+        const [credits, debits] = await Promise.all([
+          transaction.ledgerEntry.aggregate({
+            where: {
+              account: LedgerAccount.DRIVER_PAYABLE,
+              direction: LedgerDirection.CREDIT,
+              journal: { booking: { rideOfferId: rideId } },
+            },
+            _sum: { amountKobo: true },
+          }),
+          transaction.ledgerEntry.aggregate({
+            where: {
+              account: LedgerAccount.DRIVER_PAYABLE,
+              direction: LedgerDirection.DEBIT,
+              journal: { booking: { rideOfferId: rideId } },
+            },
+            _sum: { amountKobo: true },
+          }),
+        ]);
+        const amountKobo =
+          (credits._sum.amountKobo ?? 0n) - (debits._sum.amountKobo ?? 0n);
+        if (amountKobo <= 0n) {
+          await transaction.driverPayout.update({
+            where: { id: current.id },
+            data: {
+              status: PayoutStatus.CANCELLED,
+              amountKobo: 0n,
+              providerMessage: "Payout cancelled after dispute refunds",
+            },
+          });
+          return null;
+        }
+        const scheduledFor = new Date();
+        return transaction.driverPayout.update({
+          where: { id: current.id },
+          data: {
+            status: PayoutStatus.SCHEDULED,
+            amountKobo,
+            scheduledFor,
+            providerMessage: "Payout released after dispute review",
+          },
+          select: { id: true, scheduledFor: true },
+        });
+      },
+    );
+    await this.enqueuePayout(payout);
+  }
+
   async refundRideBookings(rideId: string, reason: string): Promise<void> {
     const payments = await this.database.client.paymentTransaction.findMany({
       where: {
@@ -623,11 +696,17 @@ export class PaymentService {
           kind: LedgerJournalKind.REFUND_RESERVED,
           idempotencyKey: `refund:${refund.id}:reserved`,
           currency: payment.currency,
-          entries: refundReservedEntries(
-            payment.amountKobo,
-            breakdown.refundAmountKobo,
-            breakdown.driverCompensationKobo,
-          ),
+          entries:
+            kind === RefundKind.DISPUTE_RESOLUTION
+              ? disputeRefundReservedEntries(
+                  payment.baseAmountKobo,
+                  payment.platformFeeKobo,
+                )
+              : refundReservedEntries(
+                  payment.amountKobo,
+                  breakdown.refundAmountKobo,
+                  breakdown.driverCompensationKobo,
+                ),
         });
 
         return refund.id;

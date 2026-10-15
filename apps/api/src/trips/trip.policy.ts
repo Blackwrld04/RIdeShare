@@ -20,7 +20,7 @@ const BOOKING_STATUSES_BY_VIEW = {
     BookingStatus.CONFIRMED,
     BookingStatus.IN_PROGRESS,
   ],
-  past: [BookingStatus.COMPLETED],
+  past: [BookingStatus.COMPLETED, BookingStatus.DISPUTED],
   cancelled: [
     BookingStatus.DECLINED,
     BookingStatus.CANCELLED,

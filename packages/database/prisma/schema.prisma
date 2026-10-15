@@ -78,6 +78,7 @@ enum BookingStatus {
   CONFIRMED
   IN_PROGRESS
   COMPLETED
+  DISPUTED
   DECLINED
   CANCELLED
   EXPIRED
@@ -118,6 +119,7 @@ enum RefundKind {
   PASSENGER_CANCELLATION
   DRIVER_CANCELLATION
   FULFILLMENT_FAILED
+  DISPUTE_RESOLUTION
 
   @@map("refund_kind")
 }
@@ -159,6 +161,8 @@ enum BankAccountStatus {
 
 enum PayoutStatus {
   SCHEDULED
+  ON_HOLD
+  CANCELLED
   PROCESSING
   SUBMITTED
   SUCCESS
@@ -166,6 +170,14 @@ enum PayoutStatus {
   REVERSED
 
   @@map("payout_status")
+}
+
+enum PaymentDisputeStatus {
+  OPEN
+  RELEASED
+  REFUNDED
+
+  @@map("payment_dispute_status")
 }
 
 enum IdentityVerificationStatus {
@@ -234,6 +246,8 @@ model User {
   submittedReports     UserReport[]              @relation("UserReportReporter")
   receivedReports      UserReport[]              @relation("UserReportSubject")
   reviewedReports      UserReport[]              @relation("UserReportReviewer")
+  openedPaymentDisputes PaymentDispute[]          @relation("PaymentDisputeOpenedBy")
+  reviewedPaymentDisputes PaymentDispute[]        @relation("PaymentDisputeReviewedBy")
   chatMessages         ChatMessage[]             @relation("ChatMessageSender")
   chatReadReceipts     ChatReadReceipt[]
   emergencyContacts    EmergencyContact[]
@@ -554,10 +568,33 @@ model RideBooking {
   safetyAlerts          SafetyAlert[]
   reviews               RideReview[]
   userReports           UserReport[]
+  paymentDispute        PaymentDispute?
 
   @@index([rideOfferId, status], map: "ride_bookings_offer_status_idx")
   @@index([passengerUserId, createdAt(sort: Desc)], map: "ride_bookings_passenger_created_idx")
   @@map("ride_bookings")
+}
+
+model PaymentDispute {
+  id               String               @id @default(uuid()) @db.Uuid
+  bookingId        String               @unique @map("booking_id") @db.Uuid
+  openedByUserId   String               @map("opened_by_user_id") @db.Uuid
+  status           PaymentDisputeStatus @default(OPEN)
+  reason           String               @db.VarChar(1000)
+  resolutionNote   String?              @map("resolution_note") @db.VarChar(1000)
+  reviewedByUserId String?              @map("reviewed_by_user_id") @db.Uuid
+  openedAt         DateTime             @default(now()) @map("opened_at") @db.Timestamptz(3)
+  resolvedAt       DateTime?            @map("resolved_at") @db.Timestamptz(3)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  booking          RideBooking          @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  openedBy         User                 @relation("PaymentDisputeOpenedBy", fields: [openedByUserId], references: [id], onDelete: Restrict)
+  reviewedBy       User?                @relation("PaymentDisputeReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, openedAt], map: "payment_disputes_status_opened_idx")
+  @@index([openedByUserId, openedAt(sort: Desc)], map: "payment_disputes_opener_opened_idx")
+  @@index([reviewedByUserId], map: "payment_disputes_reviewer_idx")
+  @@map("payment_disputes")
 }
 
 model RideReview {

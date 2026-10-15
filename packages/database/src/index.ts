@@ -11,6 +11,7 @@ export {
   LedgerAccount,
   LedgerDirection,
   LedgerJournalKind,
+  PaymentDisputeStatus,
   PaymentProvider,
   PaymentStatus,
   PayoutStatus,

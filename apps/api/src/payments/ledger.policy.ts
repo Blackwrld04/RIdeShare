@@ -96,6 +96,29 @@ export function refundSettledEntries(
   ];
 }
 
+export function disputeRefundReservedEntries(
+  baseAmountKobo: bigint,
+  platformFeeKobo: bigint,
+): JournalEntryInput[] {
+  return [
+    {
+      account: LedgerAccount.DRIVER_PAYABLE,
+      direction: LedgerDirection.DEBIT,
+      amountKobo: baseAmountKobo,
+    },
+    {
+      account: LedgerAccount.PLATFORM_REVENUE,
+      direction: LedgerDirection.DEBIT,
+      amountKobo: platformFeeKobo,
+    },
+    {
+      account: LedgerAccount.REFUND_PAYABLE,
+      direction: LedgerDirection.CREDIT,
+      amountKobo: baseAmountKobo + platformFeeKobo,
+    },
+  ];
+}
+
 export function tripSettledEntries(
   baseAmountKobo: bigint,
   platformFeeKobo: bigint,
@@ -159,6 +182,7 @@ export function calculateRefund(
   if (
     kind === RefundKind.DRIVER_CANCELLATION ||
     kind === RefundKind.FULFILLMENT_FAILED ||
+    kind === RefundKind.DISPUTE_RESOLUTION ||
     departureAt.getTime() - now.getTime() >= 24 * 60 * 60 * 1_000
   ) {
     return {

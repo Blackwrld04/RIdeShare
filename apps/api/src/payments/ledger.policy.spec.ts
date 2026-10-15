@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertBalancedJournal,
   calculateRefund,
+  disputeRefundReservedEntries,
   escrowFundedEntries,
   payoutReversedEntries,
   payoutSettledEntries,
@@ -20,6 +21,7 @@ describe("ledger policy", () => {
       refundReservedEntries(230_000n, 130_000n, 100_000n),
       refundSettledEntries(130_000n),
       tripSettledEntries(200_000n, 30_000n),
+      disputeRefundReservedEntries(200_000n, 30_000n),
     ].map((entries) => ({ entries })),
   )("builds a balanced journal", ({ entries }) => {
     expect(() => assertBalancedJournal(entries)).not.toThrow();
@@ -84,6 +86,21 @@ describe("ledger policy", () => {
     ).toEqual({
       refundAmountKobo: 130_000n,
       driverCompensationKobo: 100_000n,
+    });
+  });
+
+  it("fully refunds a resolved dispute", () => {
+    expect(
+      calculateRefund(
+        RefundKind.DISPUTE_RESOLUTION,
+        200_000n,
+        30_000n,
+        new Date("2026-10-14T08:00:00.000Z"),
+        new Date("2026-10-15T08:00:00.000Z"),
+      ),
+    ).toEqual({
+      refundAmountKobo: 230_000n,
+      driverCompensationKobo: 0n,
     });
   });
 });
