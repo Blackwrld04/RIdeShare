@@ -299,6 +299,12 @@ const environmentSchema = z
       .min(1_048_576)
       .max(52_428_800)
       .default(10_485_760),
+    KYC_INSPECTION_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1_048_576)
+      .max(52_428_800)
+      .default(10_485_760),
   })
   .superRefine((config, context) => {
     if (config.SMS_PROVIDER === "termii" && !config.TERMII_API_KEY) {

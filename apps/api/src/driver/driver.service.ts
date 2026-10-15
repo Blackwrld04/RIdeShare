@@ -196,11 +196,17 @@ export class DriverService {
           ownerUserId: userId,
           purpose: "driver_document",
           status: UploadStatus.READY,
+          detectedContentType: { not: null },
         },
       });
 
       if (!asset) {
         throw new BadRequestException("Upload is not ready for attachment");
+      }
+      if (asset.documentKind !== kind) {
+        throw new BadRequestException(
+          "Upload was prepared for a different document kind",
+        );
       }
 
       const attachment = await transaction.driverDocument.findUnique({

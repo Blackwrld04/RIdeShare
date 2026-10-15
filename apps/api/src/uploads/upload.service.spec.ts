@@ -33,10 +33,14 @@ function uploadAsset() {
     id: uploadId,
     ownerUserId: userId,
     purpose: "driver_document",
-    objectKey: `users/${userId}/driver_document/${uploadId}.pdf`,
+    documentKind: "driver_license",
+    objectKey: `users/${userId}/driver_document/driver_license/${uploadId}.pdf`,
     contentType: "application/pdf",
     sizeBytes: 4096n,
     checksumSha256,
+    detectedContentType: null,
+    mediaWidth: null,
+    mediaHeight: null,
     status: UploadStatus.PENDING,
     uploadExpiresAt: new Date(now.getTime() + 60_000),
     completedAt: null,
@@ -69,6 +73,7 @@ function setup() {
       sizeBytes: Number(asset.sizeBytes),
       checksumSha256: asset.checksumSha256,
     }),
+    read: vi.fn().mockResolvedValue(new TextEncoder().encode("%PDF-1.7\n")),
     delete: vi.fn().mockResolvedValue(undefined),
     onApplicationShutdown: vi.fn(),
   } as unknown as ObjectStorage;
@@ -86,6 +91,7 @@ describe("UploadService", () => {
     const { service, storage } = setup();
     const response = await service.create(userId, {
       purpose: "driver_document",
+      documentKind: "driver_license",
       contentType: "application/pdf",
       sizeBytes: 4096,
       checksumSha256,
@@ -102,6 +108,7 @@ describe("UploadService", () => {
     const response = await service.complete(userId, uploadId);
 
     expect(response.status).toBe(UploadStatus.READY);
+    expect(response.detectedContentType).toBe("application/pdf");
     expect(uploadAssetClient.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: UploadStatus.READY }),
@@ -116,6 +123,23 @@ describe("UploadService", () => {
       sizeBytes: 4097,
       checksumSha256,
     });
+
+    await expect(service.complete(userId, uploadId)).rejects.toMatchObject({
+      status: 422,
+    });
+    expect(storage.delete).toHaveBeenCalledOnce();
+    expect(uploadAssetClient.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: UploadStatus.QUARANTINED },
+      }),
+    );
+  });
+
+  it("quarantines media whose bytes do not match its declared type", async () => {
+    const { service, storage, uploadAssetClient } = setup();
+    vi.mocked(storage.read).mockResolvedValue(
+      new TextEncoder().encode("not a pdf"),
+    );
 
     await expect(service.complete(userId, uploadId)).rejects.toMatchObject({
       status: 422,
