@@ -29,6 +29,7 @@ export const socialCredentialSchema = z
   .object({
     challengeId: z.uuid(),
     idToken: z.string().min(100).max(16_384),
+    authorizationCode: z.string().min(1).max(4_096).optional(),
   })
   .strict();
 

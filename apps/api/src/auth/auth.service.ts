@@ -505,6 +505,7 @@ export class AuthService {
     const identity = await this.socialIdentities.verify(
       provider,
       input.idToken,
+      input.authorizationCode,
     );
     const nonceDigest = digestSecret(
       this.config.AUTH_REFRESH_TOKEN_SECRET,

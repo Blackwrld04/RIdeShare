@@ -40,6 +40,7 @@ describe("auth crypto", () => {
       socialCredentialSchema.safeParse({
         challengeId: "9f0403a1-5970-4ad5-83b1-f345ce34ed76",
         idToken: "x".repeat(100),
+        authorizationCode: "one-time-code",
       }).success,
     ).toBe(true);
   });
