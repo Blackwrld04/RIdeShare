@@ -57,8 +57,10 @@ describe("loadConfig", () => {
       IDENTITY_ENCRYPTION_KEY: requiredEnvironment.IDENTITY_ENCRYPTION_KEY,
       IDENTITY_HMAC_SECRET: requiredEnvironment.IDENTITY_HMAC_SECRET,
       SMS_PROVIDER: "console",
+      SMS_FALLBACK_PROVIDER: "none",
       TERMII_BASE_URL: "https://api.ng.termii.com",
       TERMII_SENDER_ID: "CommuteNG",
+      AFRICASTALKING_BASE_URL: "https://api.africastalking.com",
       WEB_PUSH_PROVIDER: "console",
       WEB_PUSH_SCAN_SECONDS: 15,
       WEB_PUSH_MAX_ATTEMPTS: 5,
@@ -115,6 +117,25 @@ describe("loadConfig", () => {
     expect(() =>
       loadConfig({ ...requiredEnvironment, SMS_PROVIDER: "termii" }),
     ).toThrow("TERMII_API_KEY");
+  });
+
+  it("requires independent credentials for an SMS fallback", () => {
+    expect(() =>
+      loadConfig({
+        ...requiredEnvironment,
+        SMS_PROVIDER: "termii",
+        TERMII_API_KEY: "termii-key",
+        SMS_FALLBACK_PROVIDER: "africastalking",
+      }),
+    ).toThrow("AFRICASTALKING_API_KEY");
+    expect(() =>
+      loadConfig({
+        ...requiredEnvironment,
+        SMS_PROVIDER: "termii",
+        TERMII_API_KEY: "termii-key",
+        SMS_FALLBACK_PROVIDER: "termii",
+      }),
+    ).toThrow("SMS_FALLBACK_PROVIDER");
   });
 
   it("requires a complete VAPID configuration when selected", () => {
