@@ -156,11 +156,17 @@ export class AuthService {
     ]);
 
     try {
-      await this.otpDelivery.send({
+      const deliveryProvider = await this.otpDelivery.send({
         phoneE164,
         code,
         expiresInSeconds: this.config.OTP_TTL_SECONDS,
       });
+      await this.database.client.phoneOtpChallenge
+        .updateMany({
+          where: { id: challengeId, consumedAt: null },
+          data: { deliveryProvider },
+        })
+        .catch(() => undefined);
     } catch {
       await this.database.client.phoneOtpChallenge.updateMany({
         where: { id: challengeId, consumedAt: null },

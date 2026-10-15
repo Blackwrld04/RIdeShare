@@ -344,6 +344,7 @@ model PhoneOtpChallenge {
   codeDigest  String    @map("code_digest") @db.VarChar(64)
   attempts    Int       @default(0)
   maxAttempts Int       @default(5) @map("max_attempts")
+  deliveryProvider String? @map("delivery_provider") @db.VarChar(32)
   expiresAt   DateTime  @map("expires_at") @db.Timestamptz(3)
   consumedAt  DateTime? @map("consumed_at") @db.Timestamptz(3)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)

@@ -182,13 +182,25 @@ const environmentSchema = z
       .default(60),
     IDENTITY_ENCRYPTION_KEY: identityEncryptionKeySchema,
     IDENTITY_HMAC_SECRET: z.string().min(32),
-    SMS_PROVIDER: z.enum(["console", "termii"]).default("console"),
+    SMS_PROVIDER: z
+      .enum(["console", "termii", "africastalking"])
+      .default("console"),
+    SMS_FALLBACK_PROVIDER: z
+      .enum(["none", "termii", "africastalking"])
+      .default("none"),
     TERMII_BASE_URL: z.string().url().default("https://api.ng.termii.com"),
     TERMII_API_KEY: z.preprocess(
       (value) => (value === "" ? undefined : value),
       z.string().min(1).optional(),
     ),
     TERMII_SENDER_ID: z.string().min(3).max(11).default("CommuteNG"),
+    AFRICASTALKING_BASE_URL: z
+      .string()
+      .url()
+      .default("https://api.africastalking.com"),
+    AFRICASTALKING_USERNAME: optionalString(z.string().trim().min(1).max(64)),
+    AFRICASTALKING_API_KEY: optionalString(z.string().trim().min(1)),
+    AFRICASTALKING_SENDER_ID: optionalString(z.string().trim().min(3).max(11)),
     WEB_PUSH_PROVIDER: z.enum(["console", "vapid"]).default("console"),
     WEB_PUSH_VAPID_SUBJECT: optionalString(vapidSubjectSchema),
     WEB_PUSH_VAPID_PUBLIC_KEY: optionalString(vapidKeySchema.min(80).max(100)),
@@ -325,11 +337,41 @@ const environmentSchema = z
       .default(10_485_760),
   })
   .superRefine((config, context) => {
-    if (config.SMS_PROVIDER === "termii" && !config.TERMII_API_KEY) {
+    const usesTermii =
+      config.SMS_PROVIDER === "termii" ||
+      config.SMS_FALLBACK_PROVIDER === "termii";
+    const usesAfricasTalking =
+      config.SMS_PROVIDER === "africastalking" ||
+      config.SMS_FALLBACK_PROVIDER === "africastalking";
+
+    if (usesTermii && !config.TERMII_API_KEY) {
       context.addIssue({
         code: "custom",
         path: ["TERMII_API_KEY"],
         message: "TERMII_API_KEY is required when SMS_PROVIDER is termii",
+      });
+    }
+
+    if (
+      usesAfricasTalking &&
+      (!config.AFRICASTALKING_USERNAME || !config.AFRICASTALKING_API_KEY)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["AFRICASTALKING_API_KEY"],
+        message:
+          "Africa's Talking username and API key are required when selected",
+      });
+    }
+
+    if (
+      config.SMS_FALLBACK_PROVIDER !== "none" &&
+      config.SMS_FALLBACK_PROVIDER === config.SMS_PROVIDER
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["SMS_FALLBACK_PROVIDER"],
+        message: "SMS fallback provider must differ from the primary provider",
       });
     }
 
@@ -354,11 +396,11 @@ const environmentSchema = z
       });
     }
 
-    if (config.NODE_ENV === "production" && config.SMS_PROVIDER !== "termii") {
+    if (config.NODE_ENV === "production" && config.SMS_PROVIDER === "console") {
       context.addIssue({
         code: "custom",
         path: ["SMS_PROVIDER"],
-        message: "Production requires the termii SMS provider",
+        message: "Production requires a live SMS provider",
       });
     }
 
