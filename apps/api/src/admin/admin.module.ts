@@ -9,5 +9,6 @@ import { AdminService } from "./admin.service.js";
   imports: [AuthModule, UploadModule],
   controllers: [AdminController],
   providers: [AdminGuard, AdminService],
+  exports: [AdminGuard],
 })
 export class AdminModule {}
