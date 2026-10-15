@@ -43,6 +43,11 @@ export class PayoutQueueService implements OnApplicationShutdown {
     );
   }
 
+  async remove(payoutId: string): Promise<void> {
+    const job = await this.queue.getJob(`payout-${payoutId}`);
+    await job?.remove();
+  }
+
   async onApplicationShutdown(): Promise<void> {
     await this.queue.close();
     this.redis.disconnect();
