@@ -39,6 +39,7 @@ describe("trip policy", () => {
     expect(getRideStatusesForView("past")).toEqual([RideStatus.COMPLETED]);
     expect(getBookingStatusesForView("past")).toEqual([
       BookingStatus.COMPLETED,
+      BookingStatus.DISPUTED,
     ]);
     expect(getRideStatusesForView("cancelled")).toEqual([RideStatus.CANCELLED]);
     expect(getBookingStatusesForView("cancelled")).toEqual([

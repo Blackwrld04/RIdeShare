@@ -4,6 +4,7 @@ export const CHAT_READABLE_BOOKING_STATUSES = [
   BookingStatus.CONFIRMED,
   BookingStatus.IN_PROGRESS,
   BookingStatus.COMPLETED,
+  BookingStatus.DISPUTED,
   BookingStatus.CANCELLED,
 ] as const;
 
