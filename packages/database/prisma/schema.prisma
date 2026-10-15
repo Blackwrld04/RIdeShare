@@ -210,6 +210,8 @@ model User {
   identityVerification UserIdentityVerification?
   notifications        UserNotification[]
   webPushSubscriptions WebPushSubscription[]
+  authoredRideReviews  RideReview[]              @relation("RideReviewAuthor")
+  receivedRideReviews  RideReview[]              @relation("RideReviewSubject")
   chatMessages         ChatMessage[]             @relation("ChatMessageSender")
   chatReadReceipts     ChatReadReceipt[]
   emergencyContacts    EmergencyContact[]
@@ -528,10 +530,30 @@ model RideBooking {
   chatMessages          ChatMessage[]
   chatReadReceipts      ChatReadReceipt[]
   safetyAlerts          SafetyAlert[]
+  reviews               RideReview[]
 
   @@index([rideOfferId, status], map: "ride_bookings_offer_status_idx")
   @@index([passengerUserId, createdAt(sort: Desc)], map: "ride_bookings_passenger_created_idx")
   @@map("ride_bookings")
+}
+
+model RideReview {
+  id            String      @id @default(uuid()) @db.Uuid
+  bookingId     String      @map("booking_id") @db.Uuid
+  authorUserId  String      @map("author_user_id") @db.Uuid
+  subjectUserId String      @map("subject_user_id") @db.Uuid
+  rating        Int         @db.SmallInt
+  comment       String?     @db.VarChar(500)
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  booking       RideBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  author        User        @relation("RideReviewAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
+  subject       User        @relation("RideReviewSubject", fields: [subjectUserId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, authorUserId], map: "ride_reviews_booking_author_key")
+  @@index([subjectUserId, createdAt(sort: Desc), id(sort: Desc)], map: "ride_reviews_subject_created_idx")
+  @@index([authorUserId, createdAt(sort: Desc)], map: "ride_reviews_author_created_idx")
+  @@map("ride_reviews")
 }
 
 model PaymentTransaction {
