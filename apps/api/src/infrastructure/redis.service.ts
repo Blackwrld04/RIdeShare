@@ -25,6 +25,10 @@ export class RedisService implements OnApplicationShutdown {
     await this.client.ping();
   }
 
+  get connection(): Redis {
+    return this.client;
+  }
+
   onApplicationShutdown(): void {
     this.client.disconnect();
   }
