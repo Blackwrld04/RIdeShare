@@ -12,8 +12,8 @@ const config = loadConfig({
   AUTH_REFRESH_TOKEN_SECRET: "b".repeat(32),
   OTP_HMAC_SECRET: "c".repeat(32),
   OTP_DEV_CODE: "000000",
-  NINJA_CLIENT_KEY: "ninja-client-key",
-  NINJA_CLIENT_SECRET: "ninja-client-secret",
+  NINJA_PUBLIC_KEY: "ninja-public-key",
+  NINJA_SECRET_KEY: "ninja-secret-key",
   IDENTITY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
   IDENTITY_HMAC_SECRET: "identity-hmac-secret-change-me-0001",
   PAYSTACK_SECRET_KEY: "sk_test_commuteshare_local",
@@ -60,6 +60,9 @@ function setup() {
     signUpload: vi.fn().mockResolvedValue({
       url: "https://storage.example/upload",
       headers: { "content-type": "application/pdf" },
+    }),
+    signDownload: vi.fn().mockResolvedValue({
+      url: "https://storage.example/download",
     }),
     inspect: vi.fn().mockResolvedValue({
       contentType: asset.contentType,

@@ -134,8 +134,8 @@ const environmentSchema = z
       .string()
       .url()
       .default("https://api.sandbox.ninja.boucloud.io"),
-    NINJA_CLIENT_KEY: z.string().min(1),
-    NINJA_CLIENT_SECRET: z.string().min(1),
+    NINJA_PUBLIC_KEY: z.string().min(1),
+    NINJA_SECRET_KEY: z.string().min(1),
     NIN_CONSENT_VERSION: z.string().min(1).max(32).default("2026-10-01"),
     NIN_RETRY_COOLDOWN_SECONDS: z.coerce
       .number()

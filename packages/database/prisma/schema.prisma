@@ -16,6 +16,14 @@ enum UserStatus {
   @@map("user_status")
 }
 
+enum UserRole {
+  USER
+  REVIEWER
+  ADMIN
+
+  @@map("user_role")
+}
+
 enum DriverApplicationStatus {
   DRAFT
   SUBMITTED
@@ -181,6 +189,7 @@ model User {
   phoneE164            String                    @unique @map("phone_e164") @db.VarChar(16)
   phoneVerifiedAt      DateTime                  @map("phone_verified_at") @db.Timestamptz(3)
   status               UserStatus                @default(ACTIVE)
+  role                 UserRole                  @default(USER)
   createdAt            DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt            DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(3)
   profile              UserProfile?
@@ -197,6 +206,8 @@ model User {
   rideLocationPings    RideLocationPing[]
   rideShareLinks       RideShareLink[]
   safetyAlerts         SafetyAlert[]
+  reviewedApplications DriverApplication[]       @relation("DriverApplicationReviewer")
+  reviewedDocuments    DriverDocument[]          @relation("DriverDocumentReviewer")
 
   @@map("users")
 }
@@ -281,10 +292,12 @@ model DriverApplication {
   state              String?                 @db.VarChar(80)
   submittedAt        DateTime?               @map("submitted_at") @db.Timestamptz(3)
   reviewedAt         DateTime?               @map("reviewed_at") @db.Timestamptz(3)
+  reviewedByUserId   String?                 @map("reviewed_by_user_id") @db.Uuid
   decisionReason     String?                 @map("decision_reason") @db.VarChar(500)
   createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
   user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy         User?                   @relation("DriverApplicationReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
   vehicle            DriverVehicle?
   documents          DriverDocument[]
   rides              RideOffer[]
@@ -293,6 +306,7 @@ model DriverApplication {
   rideSeries         RideSeries[]
 
   @@index([status, submittedAt], map: "driver_applications_status_submitted_idx")
+  @@index([reviewedByUserId], map: "driver_applications_reviewer_idx")
   @@map("driver_applications")
 }
 
@@ -325,13 +339,17 @@ model DriverDocument {
   expiresOn           DateTime?            @map("expires_on") @db.Date
   status              DriverDocumentStatus @default(PENDING)
   rejectionReason     String?              @map("rejection_reason") @db.VarChar(500)
+  reviewedAt          DateTime?            @map("reviewed_at") @db.Timestamptz(3)
+  reviewedByUserId    String?              @map("reviewed_by_user_id") @db.Uuid
   createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
   application         DriverApplication    @relation(fields: [driverApplicationId], references: [id], onDelete: Cascade)
   asset               UploadAsset?         @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  reviewedBy          User?                @relation("DriverDocumentReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([driverApplicationId, kind], map: "driver_documents_application_kind_key")
   @@index([status], map: "driver_documents_status_idx")
+  @@index([reviewedByUserId], map: "driver_documents_reviewer_idx")
   @@map("driver_documents")
 }
 

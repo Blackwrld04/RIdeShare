@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -19,6 +20,10 @@ export interface SignedUpload {
   headers: Record<string, string>;
 }
 
+export interface SignedDownload {
+  url: string;
+}
+
 export interface StoredObject {
   contentType: string | null;
   sizeBytes: number | null;
@@ -27,6 +32,10 @@ export interface StoredObject {
 
 export abstract class ObjectStorage {
   abstract signUpload(input: SignUploadInput): Promise<SignedUpload>;
+  abstract signDownload(
+    objectKey: string,
+    expiresInSeconds: number,
+  ): Promise<SignedDownload>;
   abstract inspect(objectKey: string): Promise<StoredObject | null>;
   abstract delete(objectKey: string): Promise<void>;
   abstract onApplicationShutdown(): void;
@@ -98,6 +107,21 @@ export class S3ObjectStorage extends ObjectStorage {
       }
       throw error;
     }
+  }
+
+  async signDownload(
+    objectKey: string,
+    expiresInSeconds: number,
+  ): Promise<SignedDownload> {
+    const url = await getSignedUrl(
+      this.client,
+      new GetObjectCommand({
+        Bucket: this.config.STORAGE_BUCKET,
+        Key: objectKey,
+      }),
+      { expiresIn: expiresInSeconds },
+    );
+    return { url };
   }
 
   async delete(objectKey: string): Promise<void> {
