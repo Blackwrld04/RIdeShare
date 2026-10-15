@@ -8,3 +8,5 @@ coverage
 .DS_Store
 apps/**/src/generated
 packages/**/src/generated
+.expo/
+.expo
