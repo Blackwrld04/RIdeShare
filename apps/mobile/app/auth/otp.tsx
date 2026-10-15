@@ -76,7 +76,7 @@ export default function OtpVerificationScreen() {
         totalTrips: 34,
       });
 
-      router.replace('/(tabs)');
+      router.replace('/auth/profile');
     }
   };
 
