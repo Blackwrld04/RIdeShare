@@ -28,6 +28,12 @@ describe("loadConfig", () => {
       DATABASE_URL: requiredEnvironment.DATABASE_URL,
       REDIS_URL: requiredEnvironment.REDIS_URL,
       LOG_LEVEL: "info",
+      CORS_ORIGINS: ["http://localhost:5173"],
+      TRUSTED_PROXY_CIDRS: [],
+      API_RATE_LIMIT_MAX: 300,
+      API_RATE_LIMIT_WINDOW_SECONDS: 60,
+      API_BODY_LIMIT_BYTES: 1_048_576,
+      API_REQUEST_TIMEOUT_MS: 15_000,
       AUTH_ACCESS_TOKEN_SECRET: requiredEnvironment.AUTH_ACCESS_TOKEN_SECRET,
       AUTH_REFRESH_TOKEN_SECRET: requiredEnvironment.AUTH_REFRESH_TOKEN_SECRET,
       AUTH_ACCESS_TOKEN_TTL_SECONDS: 900,
@@ -133,5 +139,33 @@ describe("loadConfig", () => {
         OTP_DEV_CODE: undefined,
       }),
     ).toThrow("NINJA_BASE_URL");
+  });
+
+  it("parses explicit browser origins and trusted proxies", () => {
+    const config = loadConfig({
+      ...requiredEnvironment,
+      CORS_ORIGINS: "https://app.example.com, https://admin.example.com",
+      TRUSTED_PROXY_CIDRS: "127.0.0.1, 10.0.0.0/8",
+    });
+
+    expect(config.CORS_ORIGINS).toEqual([
+      "https://app.example.com",
+      "https://admin.example.com",
+    ]);
+    expect(config.TRUSTED_PROXY_CIDRS).toEqual(["127.0.0.1", "10.0.0.0/8"]);
+  });
+
+  it("rejects insecure production browser origins", () => {
+    expect(() =>
+      loadConfig({
+        ...requiredEnvironment,
+        NODE_ENV: "production",
+        SMS_PROVIDER: "termii",
+        TERMII_API_KEY: "termii-key",
+        OTP_DEV_CODE: undefined,
+        NINJA_BASE_URL: "https://api.ninja.boucloud.io",
+        CORS_ORIGINS: "http://app.example.com",
+      }),
+    ).toThrow("CORS_ORIGINS");
   });
 });
