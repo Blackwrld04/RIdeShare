@@ -226,6 +226,22 @@ const environmentSchema = z
       .min(1)
       .max(60)
       .default(2),
+    GEOCODING_BASE_URL: z
+      .string()
+      .url()
+      .default("https://nominatim.openstreetmap.org"),
+    GEOCODING_USER_AGENT: z
+      .string()
+      .trim()
+      .min(8)
+      .max(200)
+      .default("CommuteShare/1.0"),
+    GEOCODING_CACHE_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(3_600)
+      .max(2_592_000)
+      .default(604_800),
     PAYOUT_DELAY_HOURS: z.coerce.number().int().min(1).max(168).default(24),
     PAYOUT_RECONCILIATION_SECONDS: z.coerce
       .number()

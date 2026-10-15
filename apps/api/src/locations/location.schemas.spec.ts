@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createLandmarkSchema,
+  geocodeSearchSchema,
   searchLandmarksSchema,
   updateLandmarkSchema,
 } from "./location.schemas.js";
@@ -51,5 +52,12 @@ describe("location schemas", () => {
         longitude: "3.3711",
       }),
     ).toMatchObject({ radiusMeters: 10_000, limit: 20 });
+  });
+
+  it("accepts explicit provider searches", () => {
+    expect(geocodeSearchSchema.parse({ q: "Yaba Lagos" })).toEqual({
+      q: "Yaba Lagos",
+      limit: 5,
+    });
   });
 });

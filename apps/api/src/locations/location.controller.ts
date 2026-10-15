@@ -8,7 +8,10 @@ import {
 } from "@nestjs/common";
 import { AccessTokenGuard } from "../auth/access-token.guard.js";
 import { ZodValidationPipe } from "../shared/zod-validation.pipe.js";
+import { GeocodingService } from "./geocoding.service.js";
 import {
+  type GeocodeSearchInput,
+  geocodeSearchSchema,
   landmarkIdSchema,
   type SearchLandmarksInput,
   searchLandmarksSchema,
@@ -20,6 +23,7 @@ import { LocationService } from "./location.service.js";
 export class LocationController {
   constructor(
     @Inject(LocationService) private readonly locations: LocationService,
+    @Inject(GeocodingService) private readonly geocoding: GeocodingService,
   ) {}
 
   @Get("landmarks")
@@ -28,6 +32,14 @@ export class LocationController {
     input: SearchLandmarksInput,
   ) {
     return this.locations.search(input);
+  }
+
+  @Get("geocode/search")
+  searchProvider(
+    @Query(new ZodValidationPipe(geocodeSearchSchema))
+    input: GeocodeSearchInput,
+  ) {
+    return this.geocoding.search(input);
   }
 
   @Get("landmarks/:landmarkId")

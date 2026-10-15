@@ -42,6 +42,13 @@ export const searchLandmarksSchema = z
     },
   );
 
+export const geocodeSearchSchema = z
+  .object({
+    q: z.string().trim().min(3).max(160),
+    limit: z.coerce.number().int().min(1).max(10).default(5),
+  })
+  .strict();
+
 export const createLandmarkSchema = z
   .object(landmarkObjectSchema.shape)
   .strict()
@@ -70,5 +77,6 @@ export const updateLandmarkSchema = z
 export const landmarkIdSchema = z.uuid();
 
 export type SearchLandmarksInput = z.infer<typeof searchLandmarksSchema>;
+export type GeocodeSearchInput = z.infer<typeof geocodeSearchSchema>;
 export type CreateLandmarkInput = z.infer<typeof createLandmarkSchema>;
 export type UpdateLandmarkInput = z.infer<typeof updateLandmarkSchema>;
