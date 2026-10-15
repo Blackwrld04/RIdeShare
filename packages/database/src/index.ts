@@ -23,6 +23,8 @@ export {
   RideSeriesStatus,
   RideStatus,
   UploadStatus,
+  UserReportCategory,
+  UserReportStatus,
   UserRole,
   UserStatus,
 } from "./generated/prisma/client.js";
