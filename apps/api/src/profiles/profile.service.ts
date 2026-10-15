@@ -15,6 +15,7 @@ export interface ProfileResponse {
   displayName: string | null;
   billingEmail: string | null;
   bio: string | null;
+  gender: string | null;
   timezone: string;
   profileComplete: boolean;
 }
@@ -42,6 +43,7 @@ export class ProfileService {
       displayName: user.profile.displayName,
       billingEmail: user.profile.billingEmail,
       bio: user.profile.bio,
+      gender: user.profile.gender,
       timezone: user.profile.timezone,
       profileComplete: Boolean(user.profile.displayName),
     };
@@ -62,6 +64,7 @@ export class ProfileService {
             ? { billingEmail: input.billingEmail }
             : {}),
           ...(input.bio !== undefined ? { bio: input.bio } : {}),
+          ...(input.gender !== undefined ? { gender: input.gender } : {}),
         },
       });
     } catch (error) {

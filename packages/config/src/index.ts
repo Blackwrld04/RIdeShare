@@ -201,6 +201,32 @@ const environmentSchema = z
       .min(0)
       .max(10_000_000)
       .default(50_000),
+    MAX_CONTRIBUTION_KOBO_PER_KM: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(1_000_000)
+      .default(50_000),
+    MAX_RIDE_CONTRIBUTION_KOBO: z.coerce
+      .number()
+      .int()
+      .min(50_000)
+      .max(100_000_000)
+      .default(5_000_000),
+    RIDE_START_EARLY_MINUTES: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(240)
+      .default(60),
+    TRAFFIC_GRACE_MINUTES: z.coerce.number().int().min(0).max(180).default(30),
+    CHECKOUT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
+    CHECKOUT_ATTEMPT_WINDOW_MINUTES: z.coerce
+      .number()
+      .int()
+      .min(5)
+      .max(1_440)
+      .default(30),
     RIDE_SERIES_MATERIALIZATION_SECONDS: z.coerce
       .number()
       .int()

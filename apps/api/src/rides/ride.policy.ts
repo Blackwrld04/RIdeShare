@@ -11,6 +11,8 @@ export interface RidePublishSnapshot {
   routePathPointCount: number;
   routeDistanceMeters: number | null;
   routeDurationSeconds: number | null;
+  contributionKobo: number;
+  maximumContributionKobo: number;
 }
 
 export interface RoutePointData extends RoutePointInput {
@@ -82,7 +84,36 @@ export function getRidePublishIssues(
     issues.push("route.corridor");
   }
 
+  if (ride.contributionKobo > ride.maximumContributionKobo) {
+    issues.push("ride.contribution_cap");
+  }
+
   return issues;
+}
+
+export function calculateMaximumContributionKobo(
+  distanceMeters: number,
+  maximumPerKilometreKobo: number,
+  absoluteMaximumKobo: number,
+): number {
+  const distanceMaximum =
+    Math.ceil(distanceMeters / 1_000) * maximumPerKilometreKobo;
+  return Math.min(absoluteMaximumKobo, distanceMaximum);
+}
+
+export function getRideStartTimingIssue(
+  departureAt: Date,
+  earlyMinutes: number,
+  graceMinutes: number,
+  now = new Date(),
+): "too_early" | "grace_expired" | null {
+  if (now.getTime() < departureAt.getTime() - earlyMinutes * 60_000) {
+    return "too_early";
+  }
+  if (now.getTime() > departureAt.getTime() + graceMinutes * 60_000) {
+    return "grace_expired";
+  }
+  return null;
 }
 
 export function isRouteGeometryAligned(

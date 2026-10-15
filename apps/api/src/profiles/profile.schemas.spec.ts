@@ -19,4 +19,10 @@ describe("profile schemas", () => {
       updateProfileSchema.safeParse({ billingEmail: "not-an-email" }).success,
     ).toBe(false);
   });
+
+  it("accepts a self-described gender for ride eligibility", () => {
+    expect(updateProfileSchema.parse({ gender: "WOMAN" })).toEqual({
+      gender: "WOMAN",
+    });
+  });
 });

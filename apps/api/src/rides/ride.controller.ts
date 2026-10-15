@@ -53,9 +53,10 @@ export class RideController {
 
   @Get("search")
   search(
+    @Req() request: AuthenticatedRequest,
     @Query(new ZodValidationPipe(searchRidesSchema)) input: SearchRidesInput,
   ): Promise<RideSearchResult[]> {
-    return this.rides.search(input);
+    return this.rides.search(request.auth.userId, input);
   }
 
   @Get(":rideId")

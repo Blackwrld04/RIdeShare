@@ -28,6 +28,7 @@ describe("ride series schemas", () => {
       timezone: "Africa/Lagos",
       lookaheadDays: 14,
       currency: "NGN",
+      womenOnly: false,
     });
   });
 

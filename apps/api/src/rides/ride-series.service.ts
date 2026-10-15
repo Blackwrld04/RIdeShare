@@ -1,3 +1,4 @@
+import type { AppConfig } from "@commuteshare/config";
 import {
   BankAccountStatus,
   DriverApplicationStatus,
@@ -12,9 +13,14 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { APP_CONFIG } from "../config.provider.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
 import { LocationService } from "../locations/location.service.js";
-import { buildRoutePoints, isRouteGeometryAligned } from "./ride.policy.js";
+import {
+  buildRoutePoints,
+  calculateMaximumContributionKobo,
+  isRouteGeometryAligned,
+} from "./ride.policy.js";
 import type { CreateRideSeriesInput } from "./ride-series.schemas.js";
 import { RideSeriesQueueService } from "./ride-series-queue.service.js";
 
@@ -38,6 +44,7 @@ export interface RideSeriesResponse {
   passengerSeats: number;
   contributionKobo: number;
   currency: string;
+  womenOnly: boolean;
   notes: string | null;
   routePath: Array<{ latitude: number; longitude: number }>;
   routeDistanceMeters: number;
@@ -63,6 +70,7 @@ export interface RideSeriesResponse {
 @Injectable()
 export class RideSeriesService {
   constructor(
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(LocationService) private readonly locations: LocationService,
     @Inject(RideSeriesQueueService)
@@ -75,7 +83,11 @@ export class RideSeriesService {
   ): Promise<RideSeriesResponse> {
     const driver = await this.database.client.driverApplication.findUnique({
       where: { userId },
-      include: { vehicle: true, bankAccount: true },
+      include: {
+        vehicle: true,
+        bankAccount: true,
+        user: { select: { profile: { select: { gender: true } } } },
+      },
     });
 
     if (!driver || driver.status !== DriverApplicationStatus.APPROVED) {
@@ -92,6 +104,9 @@ export class RideSeriesService {
         "Passenger seats exceed approved vehicle capacity",
       );
     }
+    if (input.womenOnly && driver.user.profile?.gender !== "WOMAN") {
+      throw new ForbiddenException("Only women can create a women-only ride");
+    }
     if (!input.route.path || !isRouteGeometryAligned(input.route)) {
       throw new BadRequestException(
         "Recurring route geometry must follow all supplied landmarks",
@@ -107,6 +122,16 @@ export class RideSeriesService {
     ) {
       throw new BadRequestException(
         "Recurring rides require complete route geometry",
+      );
+    }
+    const maximumContributionKobo = calculateMaximumContributionKobo(
+      routeDistanceMeters,
+      this.config.MAX_CONTRIBUTION_KOBO_PER_KM,
+      this.config.MAX_RIDE_CONTRIBUTION_KOBO,
+    );
+    if (input.contributionKobo > maximumContributionKobo) {
+      throw new BadRequestException(
+        "Ride contribution exceeds the route cost-sharing limit",
       );
     }
 
@@ -126,6 +151,7 @@ export class RideSeriesService {
             passengerSeats: input.passengerSeats,
             contributionKobo: BigInt(input.contributionKobo),
             currency: input.currency,
+            womenOnly: input.womenOnly,
             routePath: routePath as Prisma.InputJsonValue,
             routeDistanceMeters,
             routeDurationSeconds,
@@ -299,6 +325,7 @@ export class RideSeriesService {
       passengerSeats: series.passengerSeats,
       contributionKobo: Number(series.contributionKobo),
       currency: series.currency,
+      womenOnly: series.womenOnly,
       notes: series.notes,
       routePath,
       routeDistanceMeters: series.routeDistanceMeters,

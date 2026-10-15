@@ -66,6 +66,7 @@ describe("ride schemas", () => {
 
     expect(ride.timezone).toBe("Africa/Lagos");
     expect(ride.currency).toBe("NGN");
+    expect(ride.womenOnly).toBe(false);
     expect(ride.route.waypoints).toEqual([]);
   });
 
