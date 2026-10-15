@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -20,6 +20,7 @@ export default function SearchScreen() {
   const { theme, rides, searchOrigin, searchDest } = useAppStore();
 
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
+  const [selectedFilter, setSelectedFilter] = useState<'Cheapest' | 'Fastest' | 'Women-only'>('Cheapest');
 
   const calendarDays = [
     { day: 'TUE', date: '16' },
@@ -29,6 +30,28 @@ export default function SearchScreen() {
     { day: 'SAT', date: '20' },
     { day: 'SUN', date: '21' },
   ];
+
+  const filteredRides = useMemo(() => {
+    const sorted = [...rides];
+
+    if (selectedFilter === 'Cheapest') {
+      sorted.sort((a, b) => a.contributionKobo - b.contributionKobo);
+    }
+
+    if (selectedFilter === 'Fastest') {
+      sorted.sort((a, b) => {
+        const aMinutes = new Date(a.estimatedArrival).getTime() - new Date(a.departureTime).getTime();
+        const bMinutes = new Date(b.estimatedArrival).getTime() - new Date(b.departureTime).getTime();
+        return aMinutes - bMinutes;
+      });
+    }
+
+    if (selectedFilter === 'Women-only') {
+      return sorted.filter((ride) => ride.isFemaleOnly);
+    }
+
+    return sorted;
+  }, [rides, selectedFilter]);
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -135,9 +158,38 @@ export default function SearchScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        <View style={styles.filterRow}>
+          {(['Cheapest', 'Fastest', 'Women-only'] as const).map((option) => {
+            const selected = selectedFilter === option;
+            return (
+              <TouchableOpacity
+                key={option}
+                activeOpacity={0.8}
+                onPress={() => setSelectedFilter(option)}
+                style={[
+                  styles.filterChip,
+                  {
+                    backgroundColor: selected ? theme.chipActiveBg : theme.surfaceCard,
+                    borderColor: theme.surfaceBorder,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    { color: selected ? theme.chipActiveText : theme.textSecondary },
+                  ]}
+                >
+                  {option}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         <View style={styles.resultsHeaderRow}>
           <Text style={[styles.resultsCount, { color: theme.textPrimary }]}>
-            32 rides available
+            {filteredRides.length} rides available
           </Text>
           <TouchableOpacity>
             <Text style={[styles.seeAllText, { color: theme.textSecondary }]}>
@@ -147,12 +199,12 @@ export default function SearchScreen() {
         </View>
 
         <View style={styles.ridesList}>
-          {rides.map((ride, index) => (
+          {filteredRides.map((ride, index) => (
             <RideCard
               key={ride.id}
               ride={ride}
               onPress={() => router.push(`/rides/${ride.id}`)}
-              tag={index === 0 ? 'Cheapest' : index === 1 ? 'Fastest' : undefined}
+              tag={index === 0 ? selectedFilter : undefined}
             />
           ))}
         </View>
@@ -216,6 +268,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 110,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 18,
+  },
+  filterChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   resultsHeaderRow: {
     flexDirection: 'row',

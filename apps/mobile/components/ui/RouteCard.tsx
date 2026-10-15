@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Platform,
 } from 'react-native';
 import {
   ArrowUpDown,
@@ -39,9 +38,30 @@ export const RouteCard: React.FC<RouteCardProps> = ({ onSearchPress, compact = f
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showSeatPicker, setShowSeatPicker] = useState(false);
+  const [focusedField, setFocusedField] = useState<'from' | 'to' | null>(null);
 
   const dates = ['Today 14 May', 'Tomorrow 15 May', '16 May', '17 May'];
   const seatOptions = [1, 2, 3, 4];
+
+  const suggestions = useMemo(() => {
+    const hubs = [
+      'Berger Bus Stop, Lagos',
+      'Lekki Toll Gate, Lagos',
+      'CMS Marina, Lagos Island',
+      'Ikeja GRA, Lagos',
+      'Gwarinpa, Abuja',
+      'Wuse Zone 4, Abuja',
+      'Ikorodu BRT Terminal, Lagos',
+      'Victoria Island, Lagos',
+    ];
+
+    const filter = (value: string) => {
+      if (!value.trim()) return hubs.slice(0, 4);
+      return hubs.filter((entry) => entry.toLowerCase().includes(value.toLowerCase())).slice(0, 4);
+    };
+
+    return focusedField === 'from' ? filter(searchOrigin) : focusedField === 'to' ? filter(searchDest) : [];
+  }, [focusedField, searchOrigin, searchDest]);
 
   return (
     <View
@@ -70,11 +90,30 @@ export const RouteCard: React.FC<RouteCardProps> = ({ onSearchPress, compact = f
             <TextInput
               value={searchOrigin}
               onChangeText={setSearchOrigin}
+              onFocus={() => setFocusedField('from')}
               placeholder="e.g. Berger Bus Stop, Lagos"
               placeholderTextColor="#9CA3AF"
               style={[styles.textInput, { color: theme.heroCardText }]}
             />
           </View>
+
+          {focusedField === 'from' && suggestions.length > 0 && (
+            <View style={[styles.suggestionBox, { backgroundColor: theme.surfaceCard, borderColor: theme.surfaceBorder }]}>
+              {suggestions.map((suggestion) => (
+                <TouchableOpacity
+                  key={suggestion}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setSearchOrigin(suggestion);
+                    setFocusedField(null);
+                  }}
+                  style={styles.suggestionRow}
+                >
+                  <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>{suggestion}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           <View style={styles.horizontalDivider} />
 
@@ -84,11 +123,30 @@ export const RouteCard: React.FC<RouteCardProps> = ({ onSearchPress, compact = f
             <TextInput
               value={searchDest}
               onChangeText={setSearchDest}
+              onFocus={() => setFocusedField('to')}
               placeholder="e.g. Victoria Island, Lagos"
               placeholderTextColor="#9CA3AF"
               style={[styles.textInput, { color: theme.heroCardText }]}
             />
           </View>
+
+          {focusedField === 'to' && suggestions.length > 0 && (
+            <View style={[styles.suggestionBox, { backgroundColor: theme.surfaceCard, borderColor: theme.surfaceBorder }]}>
+              {suggestions.map((suggestion) => (
+                <TouchableOpacity
+                  key={suggestion}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setSearchDest(suggestion);
+                    setFocusedField(null);
+                  }}
+                  style={styles.suggestionRow}
+                >
+                  <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>{suggestion}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Circular Swap Button */}
@@ -286,6 +344,22 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#E5E7EB',
     marginVertical: 8,
+  },
+  suggestionBox: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  suggestionRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(148, 163, 184, 0.2)',
+  },
+  suggestionText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   swapButton: {
     position: 'absolute',

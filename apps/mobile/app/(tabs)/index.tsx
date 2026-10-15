@@ -18,6 +18,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { HeaderGradient } from '../../components/ui/HeaderGradient';
 import { RouteCard } from '../../components/ui/RouteCard';
 import { RideCard } from '../../components/ui/RideCard';
+import { HeroCarousel } from '../../components/ui/HeroCarousel';
 import { NigerianCorridors } from '../../constants/theme';
 
 export default function HomeScreen() {
@@ -26,6 +27,7 @@ export default function HomeScreen() {
     themeMode,
     user,
     rides,
+    activeTrip,
     setSearchOrigin,
     setSearchDest,
   } = useAppStore();
@@ -54,6 +56,29 @@ export default function HomeScreen() {
             <RouteCard onSearchPress={() => router.push('/(tabs)/search')} />
           </View>
         </HeaderGradient>
+
+        <HeroCarousel />
+
+        {activeTrip && (
+          <View style={styles.sectionContainer}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => router.push(`/tracking/${activeTrip.id}`)}
+              style={[styles.activeTripCard, { backgroundColor: theme.surfaceCard, borderColor: theme.surfaceBorder }]}
+            >
+              <View style={styles.activeTripHeaderRow}>
+                <Text style={[styles.activeTripLabel, { color: theme.textSecondary }]}>Active trip</Text>
+                <Text style={[styles.activeTripMeta, { color: theme.textMuted }]}>Live</Text>
+              </View>
+              <Text style={[styles.activeTripRoute, { color: theme.textPrimary }]}>
+                {activeTrip.pickupLandmark} → {activeTrip.dropoffLandmark}
+              </Text>
+              <Text style={[styles.activeTripDriver, { color: theme.textSecondary }]}>
+                Driver: {activeTrip.ride.driverName}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Best Rides Section (Screen 1 Inspiration) */}
         <View style={styles.sectionContainer}>
@@ -170,6 +195,36 @@ const styles = StyleSheet.create({
   },
   routeCardWrapper: {
     marginTop: 4,
+  },
+  activeTripCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+  },
+  activeTripHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  activeTripLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  activeTripMeta: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  activeTripRoute: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  activeTripDriver: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   sectionContainer: {
     marginTop: 24,

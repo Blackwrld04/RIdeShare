@@ -61,7 +61,7 @@ export default function OnboardingScreen() {
     if (currentIndex < slides.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     } else {
-      router.replace('/(tabs)');
+      router.replace('/auth');
     }
   };
 

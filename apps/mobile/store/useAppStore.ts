@@ -33,6 +33,7 @@ export interface AppState {
   rides: RideOffer[];
   bookings: Booking[];
   activeTrip: Booking | null;
+  addRide: (ride: RideOffer) => void;
   addBooking: (booking: Booking) => void;
   setActiveTrip: (booking: Booking | null) => void;
 
@@ -209,6 +210,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   rides: mockInitialRides,
   bookings: [mockInitialBooking],
   activeTrip: mockInitialBooking,
+  addRide: (ride) => set((state) => ({ rides: [ride, ...state.rides] })),
   addBooking: (booking) => set((state) => ({ bookings: [booking, ...state.bookings], activeTrip: booking })),
   setActiveTrip: (activeTrip) => set({ activeTrip }),
 
