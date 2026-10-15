@@ -5,6 +5,7 @@ describe("upload schemas", () => {
   it("normalizes checksum metadata", () => {
     const result = createUploadSchema.parse({
       purpose: "driver_document",
+      documentKind: "driver_license",
       contentType: "application/pdf",
       sizeBytes: 4096,
       checksumSha256: "A".repeat(64),
@@ -17,7 +18,20 @@ describe("upload schemas", () => {
     expect(
       createUploadSchema.safeParse({
         purpose: "driver_document",
+        documentKind: "driver_license",
         contentType: "text/html",
+        sizeBytes: 4096,
+        checksumSha256: "a".repeat(64),
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires image media for profile and vehicle photos", () => {
+    expect(
+      createUploadSchema.safeParse({
+        purpose: "driver_document",
+        documentKind: "profile_photo",
+        contentType: "application/pdf",
         sizeBytes: 4096,
         checksumSha256: "a".repeat(64),
       }).success,

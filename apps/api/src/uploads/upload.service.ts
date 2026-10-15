@@ -13,6 +13,7 @@ import {
 } from "@nestjs/common";
 import { APP_CONFIG } from "../config.provider.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
+import { inspectKycMedia } from "./kyc-media.policy.js";
 import {
   ObjectStorage,
   objectExtensionForContentType,
@@ -25,10 +26,14 @@ type UploadAssetRecord = Prisma.UploadAssetGetPayload<Record<string, never>>;
 export interface UploadResponse {
   id: string;
   purpose: string;
+  documentKind: string | null;
   status: string;
   contentType: string;
   sizeBytes: number;
   checksumSha256: string;
+  detectedContentType: string | null;
+  mediaWidth: number | null;
+  mediaHeight: number | null;
   uploadExpiresAt: string;
   completedAt: string | null;
   createdAt: string;
@@ -60,7 +65,7 @@ export class UploadService {
 
     const id = randomUUID();
     const extension = objectExtensionForContentType(input.contentType);
-    const objectKey = `users/${userId}/${input.purpose}/${id}.${extension}`;
+    const objectKey = `users/${userId}/${input.purpose}/${input.documentKind}/${id}.${extension}`;
     const uploadExpiresAt = new Date(
       Date.now() + this.config.UPLOAD_URL_TTL_SECONDS * 1_000,
     );
@@ -69,6 +74,7 @@ export class UploadService {
         id,
         ownerUserId: userId,
         purpose: input.purpose,
+        documentKind: input.documentKind,
         objectKey,
         contentType: input.contentType,
         sizeBytes: BigInt(input.sizeBytes),
@@ -149,10 +155,46 @@ export class UploadService {
       });
     }
 
+    let bytes: Uint8Array | null;
+    try {
+      bytes = await this.storage.read(
+        asset.objectKey,
+        this.config.KYC_INSPECTION_MAX_BYTES,
+      );
+    } catch {
+      throw new ServiceUnavailableException("Unable to inspect upload");
+    }
+    if (!bytes || !asset.documentKind) {
+      throw new BadRequestException("Uploaded media could not be inspected");
+    }
+    const inspection = await inspectKycMedia(
+      bytes,
+      asset.documentKind,
+      asset.contentType,
+    );
+    if (inspection.issues.length > 0) {
+      await this.storage.delete(asset.objectKey).catch(() => undefined);
+      await this.database.client.uploadAsset.updateMany({
+        where: { id: asset.id, status: UploadStatus.PENDING },
+        data: { status: UploadStatus.QUARANTINED },
+      });
+      throw new UnprocessableEntityException({
+        code: "UPLOAD_MEDIA_INVALID",
+        message: "Uploaded media failed inspection",
+        fields: inspection.issues,
+      });
+    }
+
     const completedAt = new Date();
     const completed = await this.database.client.uploadAsset.updateMany({
       where: { id: asset.id, status: UploadStatus.PENDING },
-      data: { status: UploadStatus.READY, completedAt },
+      data: {
+        status: UploadStatus.READY,
+        completedAt,
+        detectedContentType: inspection.detectedContentType,
+        mediaWidth: inspection.width,
+        mediaHeight: inspection.height,
+      },
     });
 
     if (completed.count !== 1) {
@@ -163,6 +205,9 @@ export class UploadService {
       ...asset,
       status: UploadStatus.READY,
       completedAt,
+      detectedContentType: inspection.detectedContentType,
+      mediaWidth: inspection.width,
+      mediaHeight: inspection.height,
     });
   }
 
@@ -204,10 +249,14 @@ export class UploadService {
     return {
       id: asset.id,
       purpose: asset.purpose,
+      documentKind: asset.documentKind,
       status: asset.status,
       contentType: asset.contentType,
       sizeBytes: Number(asset.sizeBytes),
       checksumSha256: asset.checksumSha256,
+      detectedContentType: asset.detectedContentType,
+      mediaWidth: asset.mediaWidth,
+      mediaHeight: asset.mediaHeight,
       uploadExpiresAt: asset.uploadExpiresAt.toISOString(),
       completedAt: asset.completedAt?.toISOString() ?? null,
       createdAt: asset.createdAt.toISOString(),

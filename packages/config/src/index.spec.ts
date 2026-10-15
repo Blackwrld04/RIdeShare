@@ -88,6 +88,7 @@ describe("loadConfig", () => {
       STORAGE_FORCE_PATH_STYLE: false,
       UPLOAD_URL_TTL_SECONDS: 900,
       UPLOAD_MAX_BYTES: 10_485_760,
+      KYC_INSPECTION_MAX_BYTES: 10_485_760,
     });
   });
 

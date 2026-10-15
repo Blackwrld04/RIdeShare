@@ -37,6 +37,10 @@ export abstract class ObjectStorage {
     expiresInSeconds: number,
   ): Promise<SignedDownload>;
   abstract inspect(objectKey: string): Promise<StoredObject | null>;
+  abstract read(
+    objectKey: string,
+    maxBytes: number,
+  ): Promise<Uint8Array | null>;
   abstract delete(objectKey: string): Promise<void>;
   abstract onApplicationShutdown(): void;
 }
@@ -122,6 +126,24 @@ export class S3ObjectStorage extends ObjectStorage {
       { expiresIn: expiresInSeconds },
     );
     return { url };
+  }
+
+  async read(objectKey: string, maxBytes: number): Promise<Uint8Array | null> {
+    try {
+      const object = await this.client.send(
+        new GetObjectCommand({
+          Bucket: this.config.STORAGE_BUCKET,
+          Key: objectKey,
+          Range: `bytes=0-${maxBytes - 1}`,
+        }),
+      );
+      return object.Body ? object.Body.transformToByteArray() : null;
+    } catch (error) {
+      if (isNotFound(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   async delete(objectKey: string): Promise<void> {
