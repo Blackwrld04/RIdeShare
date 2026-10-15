@@ -13,6 +13,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { DatabaseService } from "../infrastructure/database.service.js";
+import { LocationService } from "../locations/location.service.js";
 import { buildRoutePoints, isRouteGeometryAligned } from "./ride.policy.js";
 import type { CreateRideSeriesInput } from "./ride-series.schemas.js";
 import { RideSeriesQueueService } from "./ride-series-queue.service.js";
@@ -52,6 +53,7 @@ export interface RideSeriesResponse {
     longitude: number;
     externalSource: string | null;
     externalId: string | null;
+    safeLandmarkId: string | null;
   }>;
   lastGeneratedThrough: string | null;
   createdAt: string;
@@ -62,6 +64,7 @@ export interface RideSeriesResponse {
 export class RideSeriesService {
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(LocationService) private readonly locations: LocationService,
     @Inject(RideSeriesQueueService)
     private readonly queue: RideSeriesQueueService,
   ) {}
@@ -94,6 +97,7 @@ export class RideSeriesService {
         "Recurring route geometry must follow all supplied landmarks",
       );
     }
+    await this.locations.assertRouteLandmarks(input.route);
     const routePath = input.route.path;
     const routeDistanceMeters = input.route.distanceMeters;
     const routeDurationSeconds = input.route.durationSeconds;
@@ -144,6 +148,9 @@ export class RideSeriesService {
                   ? { externalSource: point.externalSource }
                   : {}),
                 ...(point.externalId ? { externalId: point.externalId } : {}),
+                ...(point.safeLandmarkId
+                  ? { safeLandmarkId: point.safeLandmarkId }
+                  : {}),
               })),
             },
           },
@@ -307,6 +314,7 @@ export class RideSeriesService {
         longitude: Number(point.longitude),
         externalSource: point.externalSource,
         externalId: point.externalId,
+        safeLandmarkId: point.safeLandmarkId,
       })),
       lastGeneratedThrough:
         series.lastGeneratedThrough?.toISOString().slice(0, 10) ?? null,

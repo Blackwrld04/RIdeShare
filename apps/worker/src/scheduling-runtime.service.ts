@@ -235,6 +235,7 @@ export class SchedulingRuntimeService
             longitude,
             external_source,
             external_id,
+            safe_landmark_id,
             created_at
           )
           SELECT
@@ -247,6 +248,7 @@ export class SchedulingRuntimeService
             point.longitude,
             point.external_source,
             point.external_id,
+            point.safe_landmark_id,
             NOW()
           FROM inserted_rides AS ride
           INNER JOIN ride_series_route_points AS point

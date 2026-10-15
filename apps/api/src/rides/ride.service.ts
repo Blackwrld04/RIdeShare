@@ -19,6 +19,7 @@ import {
 } from "../bookings/booking.policy.js";
 import { APP_CONFIG } from "../config.provider.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
+import { LocationService } from "../locations/location.service.js";
 import { PaymentService } from "../payments/payment.service.js";
 import { canCompleteRide, canStartRide } from "../trips/trip.policy.js";
 import {
@@ -107,6 +108,7 @@ export interface RideOfferResponse {
     longitude: number;
     externalSource: string | null;
     externalId: string | null;
+    safeLandmarkId: string | null;
   }>;
   publishedAt: string | null;
   startedAt: string | null;
@@ -151,6 +153,7 @@ export class RideService {
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(LocationService) private readonly locations: LocationService,
     @Inject(PaymentService) private readonly payments: PaymentService,
   ) {}
 
@@ -161,6 +164,7 @@ export class RideService {
     const driver = await this.requireApprovedDriver(userId);
     this.assertSeatCapacity(input.passengerSeats, driver.vehicle.seatCapacity);
     this.assertRouteGeometry(input.route);
+    await this.locations.assertRouteLandmarks(input.route);
     const routePoints = buildRoutePoints(input.route).map((point) =>
       this.routePointData(point),
     );
@@ -408,6 +412,7 @@ export class RideService {
     );
     if (input.route) {
       this.assertRouteGeometry(input.route);
+      await this.locations.assertRouteLandmarks(input.route);
     }
     const data: Prisma.RideOfferUpdateInput = {};
 
@@ -759,6 +764,9 @@ export class RideService {
       ...(point.externalId !== undefined
         ? { externalId: point.externalId }
         : {}),
+      ...(point.safeLandmarkId !== undefined
+        ? { safeLandmarkId: point.safeLandmarkId }
+        : {}),
     };
   }
 
@@ -894,6 +902,7 @@ export class RideService {
         longitude: Number(point.longitude),
         externalSource: point.externalSource,
         externalId: point.externalId,
+        safeLandmarkId: point.safeLandmarkId,
       })),
       publishedAt: ride.publishedAt?.toISOString() ?? null,
       startedAt: ride.startedAt?.toISOString() ?? null,
