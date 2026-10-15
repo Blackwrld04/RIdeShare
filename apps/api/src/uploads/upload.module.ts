@@ -16,6 +16,6 @@ const objectStorageProvider: Provider<ObjectStorage> = {
   imports: [AuthModule],
   controllers: [UploadController],
   providers: [objectStorageProvider, UploadService],
-  exports: [UploadService],
+  exports: [ObjectStorage, UploadService],
 })
 export class UploadModule {}

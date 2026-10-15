@@ -16,6 +16,7 @@
     "mysql2": "3.24.6"
   },
   "scripts": {
+    "admin:promote": "npm run build:packages && npm run admin:promote --workspace @commuteshare/api",
     "build": "npm run build:packages && npm run build --workspace @commuteshare/api && npm run build --workspace @commuteshare/worker",
     "build:packages": "npm run build --workspace @commuteshare/config && npm run build --workspace @commuteshare/database",
     "db:deploy": "npm run db:deploy --workspace @commuteshare/database",

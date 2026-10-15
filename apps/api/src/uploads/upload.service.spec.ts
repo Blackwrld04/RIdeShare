@@ -61,6 +61,9 @@ function setup() {
       url: "https://storage.example/upload",
       headers: { "content-type": "application/pdf" },
     }),
+    signDownload: vi.fn().mockResolvedValue({
+      url: "https://storage.example/download",
+    }),
     inspect: vi.fn().mockResolvedValue({
       contentType: asset.contentType,
       sizeBytes: Number(asset.sizeBytes),

@@ -232,6 +232,8 @@ export class DriverService {
           ...this.documentData(asset, input),
           status: DriverDocumentStatus.PENDING,
           rejectionReason: null,
+          reviewedAt: null,
+          reviewedByUserId: null,
         },
       });
     });
@@ -282,6 +284,7 @@ export class DriverService {
           status: DriverApplicationStatus.SUBMITTED,
           submittedAt: new Date(),
           reviewedAt: null,
+          reviewedByUserId: null,
           decisionReason: null,
         },
       });
