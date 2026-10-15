@@ -1,6 +1,10 @@
 import { BookingStatus, RideStatus } from "@commuteshare/database";
 import { describe, expect, it } from "vitest";
-import { canReadChat, canSendChatMessage } from "./chat.policy.js";
+import {
+  canReadChat,
+  canSendChatMessage,
+  maskOffPlatformPaymentPhrases,
+} from "./chat.policy.js";
 
 describe("chat policy", () => {
   it("allows confirmed participants to chat before and during a ride", () => {
@@ -21,5 +25,16 @@ describe("chat policy", () => {
     expect(
       canSendChatMessage(BookingStatus.CANCELLED, RideStatus.CANCELLED),
     ).toBe(false);
+  });
+
+  it.each([
+    "Please pay me cash at pickup",
+    "Send it to my account instead",
+    "Transfer the money directly",
+    "Pay outside the app",
+  ])("masks off-platform payment language", (body) => {
+    expect(maskOffPlatformPaymentPhrases(body)).toContain(
+      "[payment request removed]",
+    );
   });
 });

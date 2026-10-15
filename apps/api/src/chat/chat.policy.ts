@@ -34,3 +34,18 @@ export function canSendChatMessage(
     writableRideStatuses.has(rideStatus)
   );
 }
+
+const offPlatformPaymentPatterns = [
+  /\bpay\s+(?:me\s+)?cash\b/gi,
+  /\bcash\s+payment\b/gi,
+  /\bsend\s+(?:it\s+)?to\s+my\s+account\b/gi,
+  /\btransfer\s+(?:the\s+money\s+)?directly\b/gi,
+  /\bpay\s+(?:me\s+)?outside\s+(?:the\s+)?app\b/gi,
+];
+
+export function maskOffPlatformPaymentPhrases(body: string): string {
+  return offPlatformPaymentPatterns.reduce(
+    (masked, pattern) => masked.replace(pattern, "[payment request removed]"),
+    body,
+  );
+}
