@@ -8,6 +8,41 @@ const identityEncryptionKeySchema = z.string().refine((value) => {
   }
 }, "IDENTITY_ENCRYPTION_KEY must be a base64-encoded 32-byte key");
 
+const corsOriginsSchema = z
+  .string()
+  .default("http://localhost:5173")
+  .transform((value) =>
+    value
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  )
+  .refine(
+    (origins) =>
+      origins.length > 0 &&
+      origins.every((origin) => {
+        try {
+          const url = new URL(origin);
+          return (
+            url.origin === origin && ["http:", "https:"].includes(url.protocol)
+          );
+        } catch {
+          return false;
+        }
+      }),
+    "CORS_ORIGINS must contain comma-separated HTTP origins",
+  );
+
+const trustedProxySchema = z
+  .string()
+  .default("")
+  .transform((value) =>
+    value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+  );
+
 export const PAYOUT_QUEUE_NAME = "driver-payouts";
 export const PROCESS_PAYOUT_JOB = "process-payout";
 export const RECONCILE_PAYOUTS_JOB = "reconcile-payouts";
@@ -29,6 +64,32 @@ const environmentSchema = z
     LOG_LEVEL: z
       .enum(["fatal", "error", "warn", "info", "debug"])
       .default("info"),
+    CORS_ORIGINS: corsOriginsSchema,
+    TRUSTED_PROXY_CIDRS: trustedProxySchema,
+    API_RATE_LIMIT_MAX: z.coerce
+      .number()
+      .int()
+      .min(10)
+      .max(10_000)
+      .default(300),
+    API_RATE_LIMIT_WINDOW_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(3_600)
+      .default(60),
+    API_BODY_LIMIT_BYTES: z.coerce
+      .number()
+      .int()
+      .min(65_536)
+      .max(10_485_760)
+      .default(1_048_576),
+    API_REQUEST_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(120_000)
+      .default(15_000),
     AUTH_ACCESS_TOKEN_SECRET: z.string().min(32),
     AUTH_REFRESH_TOKEN_SECRET: z.string().min(32),
     AUTH_ACCESS_TOKEN_TTL_SECONDS: z.coerce
@@ -207,6 +268,21 @@ const environmentSchema = z
         code: "custom",
         path: ["NINJA_BASE_URL"],
         message: "Production requires the live Ninja API",
+      });
+    }
+
+    if (
+      config.NODE_ENV === "production" &&
+      config.CORS_ORIGINS.some((origin) => {
+        const url = new URL(origin);
+        return url.protocol !== "https:" || url.hostname === "localhost";
+      })
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["CORS_ORIGINS"],
+        message:
+          "Production CORS origins must use HTTPS and cannot use localhost",
       });
     }
   });
