@@ -182,16 +182,24 @@ describe("loadConfig", () => {
     ).toThrow("IDENTITY_ENCRYPTION_KEY");
   });
 
-  it("rejects the Ninja sandbox in production", () => {
-    expect(() =>
-      loadConfig({
-        ...requiredEnvironment,
-        NODE_ENV: "production",
-        SMS_PROVIDER: "termii",
-        TERMII_API_KEY: "termii-key",
-        OTP_DEV_CODE: undefined,
-      }),
-    ).toThrow("NINJA_BASE_URL");
+  it("allows sandbox identity and payment providers in production", () => {
+    const config = loadConfig({
+      ...requiredEnvironment,
+      NODE_ENV: "production",
+      CORS_ORIGINS: "https://app.commuteshare.ng",
+      SMS_PROVIDER: "termii",
+      TERMII_API_KEY: "termii-key",
+      OTP_DEV_CODE: undefined,
+      WEB_PUSH_PROVIDER: "vapid",
+      WEB_PUSH_VAPID_SUBJECT: "mailto:ops@commuteshare.ng",
+      WEB_PUSH_VAPID_PUBLIC_KEY: "A".repeat(87),
+      WEB_PUSH_VAPID_PRIVATE_KEY: "B".repeat(43),
+    });
+
+    expect(config.NINJA_BASE_URL).toBe("https://api.sandbox.ninja.boucloud.io");
+    expect(config.PAYSTACK_SECRET_KEY).toBe(
+      requiredEnvironment.PAYSTACK_SECRET_KEY,
+    );
   });
 
   it("parses explicit browser origins and trusted proxies", () => {

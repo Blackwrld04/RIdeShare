@@ -443,17 +443,6 @@ const environmentSchema = z
 
     if (
       config.NODE_ENV === "production" &&
-      new URL(config.NINJA_BASE_URL).hostname.includes("sandbox")
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["NINJA_BASE_URL"],
-        message: "Production requires the live Ninja API",
-      });
-    }
-
-    if (
-      config.NODE_ENV === "production" &&
       config.CORS_ORIGINS.some((origin) => {
         const url = new URL(origin);
         return url.protocol !== "https:" || url.hostname === "localhost";
