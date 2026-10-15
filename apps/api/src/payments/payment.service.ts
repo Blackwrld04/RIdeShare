@@ -16,6 +16,7 @@ import {
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Inject,
   Injectable,
   Logger,
@@ -1038,6 +1039,26 @@ export class PaymentService {
           reference: existing.reference,
           bookingId: booking.id,
         };
+      }
+
+      const attemptWindowStartedAt = new Date(
+        Date.now() - this.config.CHECKOUT_ATTEMPT_WINDOW_MINUTES * 60_000,
+      );
+      const recentAttempts = await transaction.paymentTransaction.count({
+        where: {
+          bookingId: booking.id,
+          createdAt: { gte: attemptWindowStartedAt },
+        },
+      });
+      if (recentAttempts >= this.config.CHECKOUT_MAX_ATTEMPTS) {
+        throw new HttpException(
+          {
+            code: "CHECKOUT_RATE_LIMITED",
+            message: "Checkout attempt limit reached",
+            retryAfterSeconds: this.config.CHECKOUT_ATTEMPT_WINDOW_MINUTES * 60,
+          },
+          429,
+        );
       }
 
       const platformFeeKobo = calculatePlatformFeeKobo(

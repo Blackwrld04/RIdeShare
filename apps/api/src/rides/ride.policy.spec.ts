@@ -2,8 +2,10 @@ import { DriverApplicationStatus, RidePointKind } from "@commuteshare/database";
 import { describe, expect, it } from "vitest";
 import {
   buildRoutePoints,
+  calculateMaximumContributionKobo,
   calculateSegmentContribution,
   getRidePublishIssues,
+  getRideStartTimingIssue,
   isRouteGeometryAligned,
 } from "./ride.policy.js";
 
@@ -38,6 +40,8 @@ describe("ride policy", () => {
           routePathPointCount: 3,
           routeDistanceMeters: 12_000,
           routeDurationSeconds: 1_800,
+          contributionKobo: 300_000,
+          maximumContributionKobo: 600_000,
         },
         new Date("2026-10-14T12:00:00.000Z"),
       ),
@@ -57,6 +61,8 @@ describe("ride policy", () => {
           routePathPointCount: 0,
           routeDistanceMeters: null,
           routeDurationSeconds: null,
+          contributionKobo: 700_000,
+          maximumContributionKobo: 600_000,
         },
         new Date("2026-10-14T12:00:00.000Z"),
       ),
@@ -68,6 +74,7 @@ describe("ride policy", () => {
       "route.origin",
       "route.destination",
       "route.corridor",
+      "ride.contribution_cap",
     ]);
   });
 
@@ -101,5 +108,42 @@ describe("ride policy", () => {
       50_000,
     );
     expect(calculateSegmentContribution(0, 0.1, 0.9, 50_000)).toBe(0);
+  });
+
+  it("caps contributions by route distance and an absolute ceiling", () => {
+    expect(calculateMaximumContributionKobo(8_200, 50_000, 5_000_000)).toBe(
+      450_000,
+    );
+    expect(calculateMaximumContributionKobo(200_000, 50_000, 5_000_000)).toBe(
+      5_000_000,
+    );
+  });
+
+  it("bounds ride starts around departure with traffic grace", () => {
+    const departure = new Date("2026-10-14T12:00:00.000Z");
+    expect(
+      getRideStartTimingIssue(
+        departure,
+        60,
+        30,
+        new Date("2026-10-14T10:59:59.000Z"),
+      ),
+    ).toBe("too_early");
+    expect(
+      getRideStartTimingIssue(
+        departure,
+        60,
+        30,
+        new Date("2026-10-14T12:20:00.000Z"),
+      ),
+    ).toBeNull();
+    expect(
+      getRideStartTimingIssue(
+        departure,
+        60,
+        30,
+        new Date("2026-10-14T12:30:01.000Z"),
+      ),
+    ).toBe("grace_expired");
   });
 });

@@ -176,12 +176,19 @@ export class BookingService {
 
           const passenger = await transaction.user.findUnique({
             where: { id: userId },
-            select: { profile: { select: { displayName: true } } },
+            select: {
+              profile: { select: { displayName: true, gender: true } },
+            },
           });
 
           if (!passenger?.profile?.displayName) {
             throw new BadRequestException(
               "Complete your profile before booking a ride",
+            );
+          }
+          if (ride.womenOnly && passenger.profile.gender !== "WOMAN") {
+            throw new ForbiddenException(
+              "This ride is available only to women",
             );
           }
 

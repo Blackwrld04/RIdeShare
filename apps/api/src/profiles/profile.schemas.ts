@@ -11,13 +11,18 @@ export const updateProfileSchema = z
       .nullable()
       .optional(),
     bio: z.string().trim().max(280).nullable().optional(),
+    gender: z
+      .enum(["WOMAN", "MAN", "NON_BINARY", "PREFER_NOT_TO_SAY"])
+      .nullable()
+      .optional(),
   })
   .strict()
   .refine(
     (value) =>
       value.displayName !== undefined ||
       value.billingEmail !== undefined ||
-      value.bio !== undefined,
+      value.bio !== undefined ||
+      value.gender !== undefined,
     { message: "At least one profile field is required" },
   );
 

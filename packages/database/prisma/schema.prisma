@@ -24,6 +24,15 @@ enum UserRole {
   @@map("user_role")
 }
 
+enum ProfileGender {
+  WOMAN
+  MAN
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+
+  @@map("profile_gender")
+}
+
 enum DriverApplicationStatus {
   DRAFT
   SUBMITTED
@@ -291,6 +300,7 @@ model UserProfile {
   displayName  String?  @map("display_name") @db.VarChar(80)
   billingEmail String?  @unique @map("billing_email") @db.VarChar(255)
   bio          String?  @db.VarChar(280)
+  gender       ProfileGender?
   timezone     String   @default("Africa/Lagos") @db.VarChar(64)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -431,6 +441,7 @@ model RideOffer {
   passengerSeats       Int                                       @map("passenger_seats") @db.SmallInt
   contributionKobo     BigInt                                    @map("contribution_kobo")
   currency             String                                    @default("NGN") @db.Char(3)
+  womenOnly            Boolean                                   @default(false) @map("women_only")
   routePath            Json?                                     @map("route_path") @db.JsonB
   routeDistanceMeters  Int?                                      @map("route_distance_meters")
   routeDurationSeconds Int?                                      @map("route_duration_seconds")
@@ -475,6 +486,7 @@ model RideSeries {
   passengerSeats       Int                                       @map("passenger_seats") @db.SmallInt
   contributionKobo     BigInt                                    @map("contribution_kobo")
   currency             String                                    @default("NGN") @db.Char(3)
+  womenOnly            Boolean                                   @default(false) @map("women_only")
   routePath            Json                                      @map("route_path") @db.JsonB
   routeDistanceMeters  Int                                       @map("route_distance_meters")
   routeDurationSeconds Int                                       @map("route_duration_seconds")

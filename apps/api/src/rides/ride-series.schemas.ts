@@ -30,6 +30,7 @@ export const createRideSeriesSchema = z
     passengerSeats: z.number().int().min(1).max(7),
     contributionKobo: z.number().int().nonnegative().max(100_000_000),
     currency: z.literal("NGN").default("NGN"),
+    womenOnly: z.boolean().default(false),
     notes: z.string().trim().max(280).optional(),
     route: rideRouteSchema.refine(
       (route) =>

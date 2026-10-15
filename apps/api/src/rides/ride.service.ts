@@ -24,8 +24,10 @@ import { PaymentService } from "../payments/payment.service.js";
 import { canCompleteRide, canStartRide } from "../trips/trip.policy.js";
 import {
   buildRoutePoints,
+  calculateMaximumContributionKobo,
   calculateSegmentContribution,
   getRidePublishIssues,
+  getRideStartTimingIssue,
   isRouteGeometryAligned,
   type RoutePointData,
 } from "./ride.policy.js";
@@ -47,7 +49,11 @@ const rideInclude = {
       status: true,
       userId: true,
       bankAccount: { select: { status: true } },
-      user: { select: { profile: { select: { displayName: true } } } },
+      user: {
+        select: {
+          profile: { select: { displayName: true, gender: true } },
+        },
+      },
       vehicle: {
         select: {
           make: true,
@@ -92,6 +98,7 @@ export interface RideOfferResponse {
   availableSeats: number;
   contributionKobo: number;
   currency: string;
+  womenOnly: boolean;
   routePath: Array<{ latitude: number; longitude: number }>;
   routeDistanceMeters: number | null;
   routeDurationSeconds: number | null;
@@ -115,6 +122,8 @@ export interface RideOfferResponse {
   completedAt: string | null;
   cancelledAt: string | null;
   cancellationReason: string | null;
+  startWindowOpensAt: string;
+  startWindowClosesAt: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -162,6 +171,10 @@ export class RideService {
     input: CreateRideInput,
   ): Promise<RideOfferResponse> {
     const driver = await this.requireApprovedDriver(userId);
+    this.assertWomenOnlyEligibility(
+      input.womenOnly,
+      driver.user.profile?.gender,
+    );
     this.assertSeatCapacity(input.passengerSeats, driver.vehicle.seatCapacity);
     this.assertRouteGeometry(input.route);
     await this.locations.assertRouteLandmarks(input.route);
@@ -178,6 +191,7 @@ export class RideService {
             passengerSeats: input.passengerSeats,
             contributionKobo: BigInt(input.contributionKobo),
             currency: input.currency,
+            womenOnly: input.womenOnly,
             ...this.routeMetadata(input.route),
             ...(input.notes !== undefined ? { notes: input.notes } : {}),
             routePoints: { create: routePoints },
@@ -221,7 +235,15 @@ export class RideService {
     return this.toResponse(ride);
   }
 
-  async search(input: SearchRidesInput): Promise<RideSearchResult[]> {
+  async search(
+    userId: string,
+    input: SearchRidesInput,
+  ): Promise<RideSearchResult[]> {
+    const passenger = await this.database.client.userProfile.findUnique({
+      where: { userId },
+      select: { gender: true },
+    });
+    const canJoinWomenOnly = passenger?.gender === "WOMAN";
     const departureFrom = input.departureFrom
       ? new Date(input.departureFrom)
       : new Date();
@@ -306,6 +328,7 @@ export class RideService {
           ) AS reservations
             ON reservations.ride_offer_id = ride.id
           WHERE ride.status = 'PUBLISHED'::ride_status
+            AND (ride.women_only = FALSE OR ${canJoinWomenOnly})
             AND ride.route_corridor IS NOT NULL
             AND ride.route_distance_meters IS NOT NULL
             AND ride.departure_at >= ${departureFrom}
@@ -414,6 +437,10 @@ export class RideService {
       this.assertRouteGeometry(input.route);
       await this.locations.assertRouteLandmarks(input.route);
     }
+    this.assertWomenOnlyEligibility(
+      input.womenOnly ?? ride.womenOnly,
+      ride.driverApplication.user.profile?.gender,
+    );
     const data: Prisma.RideOfferUpdateInput = {};
 
     if (input.departureAt !== undefined) {
@@ -427,6 +454,9 @@ export class RideService {
     }
     if (input.contributionKobo !== undefined) {
       data.contributionKobo = BigInt(input.contributionKobo);
+    }
+    if (input.womenOnly !== undefined) {
+      data.womenOnly = input.womenOnly;
     }
     if (input.notes !== undefined) {
       data.notes = input.notes;
@@ -489,6 +519,12 @@ export class RideService {
         routePathPointCount: this.routePath(current.routePath).length,
         routeDistanceMeters: current.routeDistanceMeters,
         routeDurationSeconds: current.routeDurationSeconds,
+        contributionKobo: Number(current.contributionKobo),
+        maximumContributionKobo: calculateMaximumContributionKobo(
+          current.routeDistanceMeters ?? 0,
+          this.config.MAX_CONTRIBUTION_KOBO_PER_KM,
+          this.config.MAX_RIDE_CONTRIBUTION_KOBO,
+        ),
       });
 
       if (issues.length > 0) {
@@ -559,6 +595,19 @@ export class RideService {
 
     if (!canStartRide(ride.status)) {
       throw new ConflictException("Ride cannot be started");
+    }
+    const timingIssue = getRideStartTimingIssue(
+      ride.departureAt,
+      this.config.RIDE_START_EARLY_MINUTES,
+      this.config.TRAFFIC_GRACE_MINUTES,
+    );
+    if (timingIssue === "too_early") {
+      throw new ConflictException(
+        "Ride cannot start before its opening window",
+      );
+    }
+    if (timingIssue === "grace_expired") {
+      throw new ConflictException("Ride departure grace period has expired");
     }
 
     await this.database.client.$transaction(async (transaction) => {
@@ -650,7 +699,7 @@ export class RideService {
   private async requireApprovedDriver(userId: string) {
     const driver = await this.database.client.driverApplication.findUnique({
       where: { userId },
-      include: { vehicle: true },
+      include: { vehicle: true, user: { include: { profile: true } } },
     });
 
     if (!driver || driver.status !== DriverApplicationStatus.APPROVED) {
@@ -662,6 +711,17 @@ export class RideService {
     }
 
     return { ...driver, vehicle: driver.vehicle };
+  }
+
+  private assertWomenOnlyEligibility(
+    womenOnly: boolean,
+    gender: string | null | undefined,
+  ): void {
+    if (womenOnly && gender !== "WOMAN") {
+      throw new ForbiddenException(
+        "Only women can create or join a women-only ride",
+      );
+    }
   }
 
   private async requireOwnedRide(
@@ -886,6 +946,7 @@ export class RideService {
           : calculateAvailableSeats(ride.passengerSeats, ride.bookings),
       contributionKobo: Number(ride.contributionKobo),
       currency: ride.currency,
+      womenOnly: ride.womenOnly,
       routePath: this.routePath(ride.routePath),
       routeDistanceMeters: ride.routeDistanceMeters,
       routeDurationSeconds: ride.routeDurationSeconds,
@@ -909,6 +970,13 @@ export class RideService {
       completedAt: ride.completedAt?.toISOString() ?? null,
       cancelledAt: ride.cancelledAt?.toISOString() ?? null,
       cancellationReason: ride.cancellationReason,
+      startWindowOpensAt: new Date(
+        ride.departureAt.getTime() -
+          this.config.RIDE_START_EARLY_MINUTES * 60_000,
+      ).toISOString(),
+      startWindowClosesAt: new Date(
+        ride.departureAt.getTime() + this.config.TRAFFIC_GRACE_MINUTES * 60_000,
+      ).toISOString(),
       createdAt: ride.createdAt.toISOString(),
       updatedAt: ride.updatedAt.toISOString(),
     };
