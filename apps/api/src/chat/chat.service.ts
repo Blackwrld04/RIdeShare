@@ -11,6 +11,7 @@ import {
   CHAT_READABLE_BOOKING_STATUSES,
   canReadChat,
   canSendChatMessage,
+  maskOffPlatformPaymentPhrases,
 } from "./chat.policy.js";
 import type {
   ListChatMessagesInput,
@@ -224,6 +225,7 @@ export class ChatService {
     if (!canSendChatMessage(booking.status, booking.rideOffer.status)) {
       throw new ConflictException("This conversation is read only");
     }
+    const body = maskOffPlatformPaymentPhrases(input.body);
     const duplicate = await this.findClientMessage(
       userId,
       input.clientMessageId,
@@ -256,7 +258,7 @@ export class ChatService {
               bookingId,
               senderUserId: userId,
               clientMessageId: input.clientMessageId,
-              body: input.body,
+              body,
             },
             select: chatMessageSelect,
           });
@@ -265,7 +267,7 @@ export class ChatService {
               userId: recipientUserId,
               kind: "chat_message",
               title: "New ride message",
-              body: input.body.slice(0, 500),
+              body: body.slice(0, 500),
               data: {
                 bookingId,
                 messageId: created.id,
@@ -291,6 +293,20 @@ export class ChatService {
         }
       }
       throw error;
+    }
+  }
+
+  async authorizeRealtime(
+    userId: string,
+    bookingId: string,
+    write: boolean,
+  ): Promise<void> {
+    const booking = await this.requireParticipant(userId, bookingId);
+    if (
+      write &&
+      !canSendChatMessage(booking.status, booking.rideOffer.status)
+    ) {
+      throw new ConflictException("This conversation is read only");
     }
   }
 

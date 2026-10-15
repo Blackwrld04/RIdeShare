@@ -16,6 +16,7 @@ import { AppModule } from "./app.module.js";
 import { APP_CONFIG } from "./config.provider.js";
 import { DatabaseService } from "./infrastructure/database.service.js";
 import { RedisService } from "./infrastructure/redis.service.js";
+import { RedisIoAdapter } from "./infrastructure/redis-io.adapter.js";
 import { ApiExceptionFilter } from "./shared/api-exception.filter.js";
 import {
   isRateLimitExemptPath,
@@ -60,15 +61,18 @@ async function bootstrap(): Promise<void> {
   const config = app.get<AppConfig>(APP_CONFIG);
   const database = app.get(DatabaseService);
   const redis = app.get(RedisService);
+  const realtime = new RedisIoAdapter(app, config);
 
   try {
     await Promise.all([database.ping(), redis.ping()]);
+    await realtime.connect();
   } catch (error) {
     await app.close();
     throw error;
   }
 
   app.setGlobalPrefix("api/v1");
+  app.useWebSocketAdapter(realtime);
   app.useGlobalFilters(new ApiExceptionFilter());
   app.enableShutdownHooks();
   await app.register(fastifyHelmet);
