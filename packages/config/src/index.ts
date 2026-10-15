@@ -141,6 +141,10 @@ const environmentSchema = z
       .default(300),
     GOOGLE_OIDC_CLIENT_IDS: clientIdsSchema,
     APPLE_OIDC_CLIENT_IDS: clientIdsSchema,
+    APPLE_TEAM_ID: optionalString(z.string().trim().length(10)),
+    APPLE_KEY_ID: optionalString(z.string().trim().length(10)),
+    APPLE_PRIVATE_KEY: optionalString(z.string().min(100)),
+    APPLE_REDIRECT_URI: optionalString(z.string().url().startsWith("https://")),
     OTP_HMAC_SECRET: z.string().min(32),
     OTP_TTL_SECONDS: z.coerce.number().int().min(60).max(600).default(300),
     OTP_MAX_ATTEMPTS: z.coerce.number().int().min(3).max(10).default(5),
@@ -343,6 +347,20 @@ const environmentSchema = z
     const usesAfricasTalking =
       config.SMS_PROVIDER === "africastalking" ||
       config.SMS_FALLBACK_PROVIDER === "africastalking";
+
+    if (
+      config.APPLE_OIDC_CLIENT_IDS.length > 0 &&
+      (!config.APPLE_TEAM_ID ||
+        !config.APPLE_KEY_ID ||
+        !config.APPLE_PRIVATE_KEY ||
+        !config.APPLE_REDIRECT_URI)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["APPLE_PRIVATE_KEY"],
+        message: "Apple web credentials and redirect URI are required",
+      });
+    }
 
     if (usesTermii && !config.TERMII_API_KEY) {
       context.addIssue({

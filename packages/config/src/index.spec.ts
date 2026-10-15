@@ -144,6 +144,15 @@ describe("loadConfig", () => {
     ).toThrow("VAPID");
   });
 
+  it("requires server credentials when Apple web login is enabled", () => {
+    expect(() =>
+      loadConfig({
+        ...requiredEnvironment,
+        APPLE_OIDC_CLIENT_IDS: "ng.commuteshare.web",
+      }),
+    ).toThrow("Apple web credentials");
+  });
+
   it("coerces storage flags and upload limits", () => {
     const config = loadConfig({
       ...requiredEnvironment,
