@@ -19,6 +19,24 @@ export const refreshSessionSchema = z
   })
   .strict();
 
+export const socialProviderSchema = z.enum(["google", "apple"]);
+
+export const createSocialChallengeSchema = z
+  .object({ provider: socialProviderSchema })
+  .strict();
+
+export const socialCredentialSchema = z
+  .object({
+    challengeId: z.uuid(),
+    idToken: z.string().min(100).max(16_384),
+  })
+  .strict();
+
 export type RequestOtpInput = z.infer<typeof requestOtpSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 export type RefreshSessionInput = z.infer<typeof refreshSessionSchema>;
+export type SocialProvider = z.infer<typeof socialProviderSchema>;
+export type CreateSocialChallengeInput = z.infer<
+  typeof createSocialChallengeSchema
+>;
+export type SocialCredentialInput = z.infer<typeof socialCredentialSchema>;

@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { AppConfig } from "@commuteshare/config";
 import { UserStatus } from "@commuteshare/database";
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   HttpException,
   HttpStatus,
@@ -14,13 +15,20 @@ import {
 import { APP_CONFIG } from "../config.provider.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
 import type {
+  CreateSocialChallengeInput,
   RefreshSessionInput,
   RequestOtpInput,
+  SocialCredentialInput,
+  SocialProvider,
   VerifyOtpInput,
 } from "./auth.schemas.js";
 import { createOtp, digestSecret, secretsMatch } from "./auth-crypto.js";
 import { OtpDelivery } from "./otp-delivery.js";
 import { normalizeNigerianPhone } from "./phone-number.js";
+import {
+  type SocialIdentity,
+  SocialIdentityVerifier,
+} from "./social-identity.verifier.js";
 import { TokenService } from "./token.service.js";
 
 export interface OtpChallengeResponse {
@@ -38,6 +46,18 @@ export interface AuthTokensResponse {
   profileComplete: boolean;
 }
 
+export interface SocialChallengeResponse {
+  challengeId: string;
+  nonce: string;
+  expiresAt: string;
+}
+
+export interface SocialAccountResponse {
+  provider: string;
+  email: string | null;
+  linkedAt: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -45,7 +65,28 @@ export class AuthService {
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(OtpDelivery) private readonly otpDelivery: OtpDelivery,
     @Inject(TokenService) private readonly tokens: TokenService,
+    @Inject(SocialIdentityVerifier)
+    private readonly socialIdentities: SocialIdentityVerifier,
   ) {}
+
+  async createSocialChallenge(
+    input: CreateSocialChallengeInput,
+  ): Promise<SocialChallengeResponse> {
+    const challengeId = randomUUID();
+    const nonce = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(
+      Date.now() + this.config.SOCIAL_AUTH_CHALLENGE_TTL_SECONDS * 1_000,
+    );
+    await this.database.client.socialAuthChallenge.create({
+      data: {
+        id: challengeId,
+        provider: input.provider,
+        nonceDigest: digestSecret(this.config.AUTH_REFRESH_TOKEN_SECRET, nonce),
+        expiresAt,
+      },
+    });
+    return { challengeId, nonce, expiresAt: expiresAt.toISOString() };
+  }
 
   async requestOtp(input: RequestOtpInput): Promise<OtpChallengeResponse> {
     let phoneE164: string;
@@ -239,6 +280,119 @@ export class AuthService {
     };
   }
 
+  async socialLogin(input: SocialCredentialInput): Promise<AuthTokensResponse> {
+    const identity = await this.consumeSocialIdentity(input);
+    const account = await this.database.client.socialAccount.findUnique({
+      where: {
+        provider_providerSubject: {
+          provider: identity.provider,
+          providerSubject: identity.subject,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            status: true,
+            profile: { select: { displayName: true } },
+          },
+        },
+      },
+    });
+    if (!account) {
+      throw new UnauthorizedException(
+        "Social account is not linked; verify your phone first",
+      );
+    }
+    if (account.user.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException("Account is not active");
+    }
+    return this.issueSession(
+      account.user.id,
+      Boolean(account.user.profile?.displayName),
+    );
+  }
+
+  async linkSocialAccount(
+    userId: string,
+    input: SocialCredentialInput,
+  ): Promise<SocialAccountResponse> {
+    const identity = await this.consumeSocialIdentity(input);
+    const account = await this.database.client.$transaction(
+      async (transaction) => {
+        const user = await transaction.user.findUnique({
+          where: { id: userId },
+          select: { status: true },
+        });
+        if (!user || user.status !== UserStatus.ACTIVE) {
+          throw new ForbiddenException("Account is not active");
+        }
+        const subjectAccount = await transaction.socialAccount.findUnique({
+          where: {
+            provider_providerSubject: {
+              provider: identity.provider,
+              providerSubject: identity.subject,
+            },
+          },
+        });
+        if (subjectAccount && subjectAccount.userId !== userId) {
+          throw new ConflictException(
+            "Social identity is linked to another account",
+          );
+        }
+        const providerAccount = await transaction.socialAccount.findUnique({
+          where: {
+            userId_provider: { userId, provider: identity.provider },
+          },
+        });
+        if (
+          providerAccount &&
+          providerAccount.providerSubject !== identity.subject
+        ) {
+          throw new ConflictException(
+            "A different identity from this provider is already linked",
+          );
+        }
+        if (subjectAccount) {
+          return subjectAccount;
+        }
+        const created = await transaction.socialAccount.create({
+          data: {
+            userId,
+            provider: identity.provider,
+            providerSubject: identity.subject,
+            email: identity.email,
+          },
+        });
+        if (identity.displayName) {
+          await transaction.userProfile.updateMany({
+            where: { userId, displayName: null },
+            data: { displayName: identity.displayName.slice(0, 80) },
+          });
+        }
+        return created;
+      },
+    );
+    return this.socialAccountResponse(account);
+  }
+
+  async listSocialAccounts(userId: string): Promise<SocialAccountResponse[]> {
+    const accounts = await this.database.client.socialAccount.findMany({
+      where: { userId },
+      orderBy: { createdAt: "asc" },
+    });
+    return accounts.map((account) => this.socialAccountResponse(account));
+  }
+
+  async unlinkSocialAccount(
+    userId: string,
+    provider: SocialProvider,
+  ): Promise<void> {
+    await this.database.client.socialAccount.deleteMany({
+      where: { userId, provider },
+    });
+  }
+
   async refreshSession(
     input: RefreshSessionInput,
   ): Promise<Omit<AuthTokensResponse, "isNewUser" | "profileComplete">> {
@@ -324,6 +478,87 @@ export class AuthService {
       where: { id: session.id },
       data: { revokedAt: new Date() },
     });
+  }
+
+  private async consumeSocialIdentity(
+    input: SocialCredentialInput,
+  ): Promise<SocialIdentity> {
+    const now = new Date();
+    const challenge = await this.database.client.socialAuthChallenge.findUnique(
+      {
+        where: { id: input.challengeId },
+      },
+    );
+    if (!challenge || challenge.consumedAt || challenge.expiresAt <= now) {
+      throw new UnauthorizedException("Invalid or expired social challenge");
+    }
+    const provider = challenge.provider as SocialProvider;
+    if (provider !== "google" && provider !== "apple") {
+      throw new UnauthorizedException("Invalid social challenge provider");
+    }
+    const identity = await this.socialIdentities.verify(
+      provider,
+      input.idToken,
+    );
+    const nonceDigest = digestSecret(
+      this.config.AUTH_REFRESH_TOKEN_SECRET,
+      identity.nonce,
+    );
+    if (!secretsMatch(challenge.nonceDigest, nonceDigest)) {
+      throw new UnauthorizedException("Social challenge nonce did not match");
+    }
+    const consumed = await this.database.client.socialAuthChallenge.updateMany({
+      where: { id: challenge.id, consumedAt: null, expiresAt: { gt: now } },
+      data: { consumedAt: now },
+    });
+    if (consumed.count !== 1) {
+      throw new UnauthorizedException("Social challenge was already used");
+    }
+    return identity;
+  }
+
+  private async issueSession(
+    userId: string,
+    profileComplete: boolean,
+  ): Promise<AuthTokensResponse> {
+    const sessionId = randomUUID();
+    const refresh = this.tokens.createRefreshToken(sessionId);
+    const refreshExpiresAt = new Date(
+      Date.now() +
+        this.config.AUTH_REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1_000,
+    );
+    await this.database.client.authSession.create({
+      data: {
+        id: sessionId,
+        userId,
+        refreshTokenDigest: refresh.digest,
+        expiresAt: refreshExpiresAt,
+      },
+    });
+    const accessToken = await this.tokens.createAccessToken({
+      userId,
+      sessionId,
+    });
+    return {
+      accessToken,
+      accessTokenExpiresIn: this.config.AUTH_ACCESS_TOKEN_TTL_SECONDS,
+      refreshToken: refresh.token,
+      refreshTokenExpiresAt: refreshExpiresAt.toISOString(),
+      isNewUser: false,
+      profileComplete,
+    };
+  }
+
+  private socialAccountResponse(account: {
+    provider: string;
+    email: string | null;
+    createdAt: Date;
+  }): SocialAccountResponse {
+    return {
+      provider: account.provider,
+      email: account.email,
+      linkedAt: account.createdAt.toISOString(),
+    };
   }
 
   private invalidOtp(): UnauthorizedException {
