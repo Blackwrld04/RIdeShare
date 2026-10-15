@@ -11,6 +11,7 @@ import { InfrastructureModule } from "./infrastructure/infrastructure.module.js"
 import { NotificationModule } from "./notifications/notification.module.js";
 import { PaymentModule } from "./payments/payment.module.js";
 import { ProfileModule } from "./profiles/profile.module.js";
+import { ReviewModule } from "./reviews/review.module.js";
 import { RideModule } from "./rides/ride.module.js";
 import { SafetyModule } from "./safety/safety.module.js";
 import { TripModule } from "./trips/trip.module.js";
@@ -27,6 +28,7 @@ import { UploadModule } from "./uploads/upload.module.js";
     PaymentModule,
     BookingModule,
     ChatModule,
+    ReviewModule,
     ProfileModule,
     DriverModule,
     UploadModule,
