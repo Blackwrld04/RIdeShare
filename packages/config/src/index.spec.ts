@@ -56,6 +56,10 @@ describe("loadConfig", () => {
       SMS_PROVIDER: "console",
       TERMII_BASE_URL: "https://api.ng.termii.com",
       TERMII_SENDER_ID: "CommuteNG",
+      WEB_PUSH_PROVIDER: "console",
+      WEB_PUSH_SCAN_SECONDS: 15,
+      WEB_PUSH_MAX_ATTEMPTS: 5,
+      WEB_PUSH_TTL_SECONDS: 3_600,
       PAYSTACK_BASE_URL: "https://api.paystack.co",
       PAYSTACK_SECRET_KEY: requiredEnvironment.PAYSTACK_SECRET_KEY,
       PAYSTACK_CALLBACK_URL: "http://localhost:3000/payments/callback",
@@ -98,6 +102,12 @@ describe("loadConfig", () => {
     expect(() =>
       loadConfig({ ...requiredEnvironment, SMS_PROVIDER: "termii" }),
     ).toThrow("TERMII_API_KEY");
+  });
+
+  it("requires a complete VAPID configuration when selected", () => {
+    expect(() =>
+      loadConfig({ ...requiredEnvironment, WEB_PUSH_PROVIDER: "vapid" }),
+    ).toThrow("VAPID");
   });
 
   it("coerces storage flags and upload limits", () => {

@@ -51,6 +51,25 @@ export const MATERIALIZE_RIDE_SERIES_JOB = "materialize-ride-series";
 export const MATERIALIZE_ACTIVE_RIDE_SERIES_JOB =
   "materialize-active-ride-series";
 export const CREATE_RIDE_REMINDERS_JOB = "create-ride-reminders";
+export const WEB_PUSH_QUEUE_NAME = "web-push";
+export const DISPATCH_WEB_PUSH_JOB = "dispatch-web-push";
+
+const optionalString = (schema: z.ZodString) =>
+  z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    schema.optional(),
+  );
+
+const vapidSubjectSchema = z.string().refine((value) => {
+  try {
+    const subject = new URL(value);
+    return subject.protocol === "mailto:" || subject.protocol === "https:";
+  } catch {
+    return false;
+  }
+}, "WEB_PUSH_VAPID_SUBJECT must be a mailto or HTTPS URL");
+
+const vapidKeySchema = z.string().regex(/^[A-Za-z0-9_-]+$/);
 
 const environmentSchema = z
   .object({
@@ -152,6 +171,18 @@ const environmentSchema = z
       z.string().min(1).optional(),
     ),
     TERMII_SENDER_ID: z.string().min(3).max(11).default("CommuteNG"),
+    WEB_PUSH_PROVIDER: z.enum(["console", "vapid"]).default("console"),
+    WEB_PUSH_VAPID_SUBJECT: optionalString(vapidSubjectSchema),
+    WEB_PUSH_VAPID_PUBLIC_KEY: optionalString(vapidKeySchema.min(80).max(100)),
+    WEB_PUSH_VAPID_PRIVATE_KEY: optionalString(vapidKeySchema.min(40).max(60)),
+    WEB_PUSH_SCAN_SECONDS: z.coerce.number().int().min(5).max(300).default(15),
+    WEB_PUSH_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(5),
+    WEB_PUSH_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(86_400)
+      .default(3_600),
     PAYSTACK_BASE_URL: z.string().url().default("https://api.paystack.co"),
     PAYSTACK_SECRET_KEY: z.string().min(16).startsWith("sk_test_"),
     PAYSTACK_CALLBACK_URL: z
@@ -244,6 +275,19 @@ const environmentSchema = z
       });
     }
 
+    if (
+      config.WEB_PUSH_PROVIDER === "vapid" &&
+      (!config.WEB_PUSH_VAPID_SUBJECT ||
+        !config.WEB_PUSH_VAPID_PUBLIC_KEY ||
+        !config.WEB_PUSH_VAPID_PRIVATE_KEY)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["WEB_PUSH_VAPID_PRIVATE_KEY"],
+        message: "VAPID subject, public key, and private key are required",
+      });
+    }
+
     if (config.NODE_ENV === "production" && config.SMS_PROVIDER !== "termii") {
       context.addIssue({
         code: "custom",
@@ -257,6 +301,17 @@ const environmentSchema = z
         code: "custom",
         path: ["OTP_DEV_CODE"],
         message: "OTP_DEV_CODE cannot be set in production",
+      });
+    }
+
+    if (
+      config.NODE_ENV === "production" &&
+      config.WEB_PUSH_PROVIDER !== "vapid"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["WEB_PUSH_PROVIDER"],
+        message: "Production requires the VAPID web push provider",
       });
     }
 
