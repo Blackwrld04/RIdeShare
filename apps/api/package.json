@@ -30,6 +30,8 @@
     "bullmq": "^6.3.15",
     "dotenv": "^17.4.2",
     "fastify": "5.12.5",
+    "file-type": "^22.2.0",
+    "image-size": "^2.0.4",
     "ioredis": "^6.0.0",
     "jose": "^6.2.12",
     "libphonenumber-js": "^1.13.15",
