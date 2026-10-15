@@ -15,6 +15,7 @@ export const routePointSchema = z
     longitude: z.number().min(-180).max(180),
     externalSource: z.string().trim().min(2).max(32).optional(),
     externalId: z.string().trim().min(1).max(128).optional(),
+    safeLandmarkId: z.uuid().optional(),
   })
   .strict()
   .refine(

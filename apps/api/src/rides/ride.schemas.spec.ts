@@ -27,6 +27,17 @@ describe("ride schemas", () => {
     expect(routePointSchema.parse(origin)).toEqual(origin);
   });
 
+  it("accepts a curated safe landmark reference independently of map data", () => {
+    expect(
+      routePointSchema.parse({
+        label: "Yaba Bus Terminal",
+        latitude: 6.5095,
+        longitude: 3.3711,
+        safeLandmarkId: "44abdc1a-2fb6-4f51-b184-012d18064834",
+      }).safeLandmarkId,
+    ).toBe("44abdc1a-2fb6-4f51-b184-012d18064834");
+  });
+
   it("rejects coordinates outside geographic bounds", () => {
     expect(
       routePointSchema.safeParse({

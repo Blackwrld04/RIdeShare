@@ -9,6 +9,7 @@ import { DriverModule } from "./driver/driver.module.js";
 import { HealthController } from "./health.controller.js";
 import { IdentityModule } from "./identity/identity.module.js";
 import { InfrastructureModule } from "./infrastructure/infrastructure.module.js";
+import { LocationModule } from "./locations/location.module.js";
 import { NotificationModule } from "./notifications/notification.module.js";
 import { PaymentModule } from "./payments/payment.module.js";
 import { ProfileModule } from "./profiles/profile.module.js";
@@ -22,6 +23,7 @@ import { UploadModule } from "./uploads/upload.module.js";
 @Module({
   imports: [
     InfrastructureModule,
+    LocationModule,
     AdminModule,
     AuthModule,
     IdentityModule,

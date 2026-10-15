@@ -494,6 +494,32 @@ model RideSeries {
   @@map("ride_series")
 }
 
+model SafeLandmark {
+  id                String                 @id @default(uuid()) @db.Uuid
+  name              String                 @db.VarChar(120)
+  address           String                 @db.VarChar(200)
+  category          String                 @db.VarChar(64)
+  city              String                 @db.VarChar(80)
+  state             String                 @db.VarChar(80)
+  latitude          Decimal                @db.Decimal(9, 6)
+  longitude         Decimal                @db.Decimal(9, 6)
+  location          Unsupported("geography(Point,4326)")?
+  externalSource    String?                @map("external_source") @db.VarChar(32)
+  externalId        String?                @map("external_id") @db.VarChar(128)
+  safetyNotes       String?                @map("safety_notes") @db.VarChar(500)
+  metadata          Json?                  @db.JsonB
+  isActive          Boolean                @default(true) @map("is_active")
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+  routePoints       RideRoutePoint[]
+  seriesRoutePoints RideSeriesRoutePoint[]
+
+  @@unique([externalSource, externalId], map: "safe_landmarks_external_key")
+  @@index([city, isActive], map: "safe_landmarks_city_active_idx")
+  @@index([category, isActive], map: "safe_landmarks_category_active_idx")
+  @@map("safe_landmarks")
+}
+
 model RideSeriesRoutePoint {
   id             String        @id @default(uuid()) @db.Uuid
   rideSeriesId   String        @map("ride_series_id") @db.Uuid
@@ -505,10 +531,13 @@ model RideSeriesRoutePoint {
   longitude      Decimal       @db.Decimal(9, 6)
   externalSource String?       @map("external_source") @db.VarChar(32)
   externalId     String?       @map("external_id") @db.VarChar(128)
+  safeLandmarkId String?       @map("safe_landmark_id") @db.Uuid
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   series         RideSeries    @relation(fields: [rideSeriesId], references: [id], onDelete: Cascade)
+  safeLandmark   SafeLandmark? @relation(fields: [safeLandmarkId], references: [id], onDelete: SetNull)
 
   @@unique([rideSeriesId, sequence], map: "ride_series_route_points_series_sequence_key")
+  @@index([safeLandmarkId], map: "ride_series_route_points_landmark_idx")
   @@map("ride_series_route_points")
 }
 
@@ -523,12 +552,15 @@ model RideRoutePoint {
   longitude      Decimal                               @db.Decimal(9, 6)
   externalSource String?                               @map("external_source") @db.VarChar(32)
   externalId     String?                               @map("external_id") @db.VarChar(128)
+  safeLandmarkId String?                               @map("safe_landmark_id") @db.Uuid
   location       Unsupported("geography(Point,4326)")?
   createdAt      DateTime                              @default(now()) @map("created_at") @db.Timestamptz(3)
   rideOffer      RideOffer                             @relation(fields: [rideOfferId], references: [id], onDelete: Cascade)
+  safeLandmark   SafeLandmark?                         @relation(fields: [safeLandmarkId], references: [id], onDelete: SetNull)
 
   @@unique([rideOfferId, sequence], map: "ride_route_points_offer_sequence_key")
   @@index([rideOfferId, kind], map: "ride_route_points_offer_kind_idx")
+  @@index([safeLandmarkId], map: "ride_route_points_landmark_idx")
   @@map("ride_route_points")
 }
 
