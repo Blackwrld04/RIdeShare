@@ -44,6 +44,8 @@ import {
   MessageSquare,
   Mail,
   Edit3,
+  Camera,
+  BookOpen,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../store/useAppStore';
@@ -51,6 +53,10 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { HelpSupportModal } from '../../components/HelpSupportModal';
+import { TermsModal } from '../../components/TermsModal';
+import { DataProtectionModal } from '../../components/DataProtectionModal';
+import { CommunityGuideModal } from '../../components/CommunityGuideModal';
+import { ChangeAvatarModal } from '../../components/ChangeAvatarModal';
 import { NIGERIAN_STATES } from '../../constants/nigerianLocations';
 import { api } from '../../services/api';
 
@@ -77,6 +83,10 @@ export default function ProfileScreen() {
   const [isChangingState, setIsChangingState] = useState(false);
   const [stateSearchQuery, setStateSearchQuery] = useState('');
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [isDataProtectionOpen, setIsDataProtectionOpen] = useState(false);
+  const [isCommunityGuideOpen, setIsCommunityGuideOpen] = useState(false);
+  const [isChangeAvatarOpen, setIsChangeAvatarOpen] = useState(false);
   const [isPersonalDetailsOpen, setIsPersonalDetailsOpen] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [isRatingsOpen, setIsRatingsOpen] = useState(false);
@@ -316,7 +326,11 @@ export default function ProfileScreen() {
                 },
               ]}
             >
-              <View style={styles.avatarWrap}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setIsChangeAvatarOpen(true)}
+                style={styles.avatarWrap}
+              >
                 {user?.avatarUrl ? (
                   <Image source={{ uri: user.avatarUrl }} style={styles.avatarImg} />
                 ) : (
@@ -329,7 +343,10 @@ export default function ProfileScreen() {
                     <User size={38} color={theme.textMuted} />
                   </View>
                 )}
-              </View>
+                <View style={styles.avatarCameraBadge}>
+                  <Camera size={13} color="#FFFFFF" />
+                </View>
+              </TouchableOpacity>
 
               <View style={styles.identityMeta}>
                 <Text style={[styles.identityName, { color: theme.textPrimary }]}>
@@ -389,23 +406,10 @@ export default function ProfileScreen() {
 
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => {
-                  Alert.alert(
-                    'Profile Photo',
-                    'Choose an option for your verified profile avatar:',
-                    [
-                      {
-                        text: 'Upload New Photo',
-                        onPress: () =>
-                          Alert.alert('Photo Updated', 'Your profile picture has been refreshed.'),
-                      },
-                      { text: 'Cancel', style: 'cancel' },
-                    ]
-                  );
-                }}
+                onPress={() => setIsChangeAvatarOpen(true)}
               >
                 <Text style={[styles.addPhotoLink, { color: theme.primary }]}>
-                  Add profile picture
+                  {user?.avatarUrl ? 'Change profile picture' : 'Add profile picture'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -746,7 +750,20 @@ export default function ProfileScreen() {
                 style={styles.accountRowItem}
               >
                 <Text style={[styles.accountRowLabel, { color: theme.textPrimary }]}>
-                  Help
+                  Help & Support
+                </Text>
+                <ChevronRight size={20} color={theme.textMuted} />
+              </TouchableOpacity>
+
+              <View style={[styles.innerRowDivider, { backgroundColor: theme.surfaceBorder }]} />
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setIsCommunityGuideOpen(true)}
+                style={styles.accountRowItem}
+              >
+                <Text style={[styles.accountRowLabel, { color: theme.textPrimary }]}>
+                  Help & Community Guide
                 </Text>
                 <ChevronRight size={20} color={theme.textMuted} />
               </TouchableOpacity>
@@ -884,12 +901,7 @@ export default function ProfileScreen() {
             >
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => {
-                  Alert.alert(
-                    'Terms & Conditions',
-                    'RideShare operates in compliance with Nigerian Federal and State carpooling regulations. Contributions are strictly for shared fuel split and vehicle operational costs without commercial passenger surcharge.'
-                  );
-                }}
+                onPress={() => setIsTermsOpen(true)}
                 style={styles.accountRowItem}
               >
                 <Text style={[styles.accountRowLabel, { color: theme.textPrimary }]}>
@@ -902,12 +914,7 @@ export default function ProfileScreen() {
 
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => {
-                  Alert.alert(
-                    'Data Protection & Privacy',
-                    'RideShare adheres to the Nigeria Data Protection Act (NDPA) and NDPR guidelines. Your national identity numbers and contact details are encrypted and never disclosed to unauthorized third parties.'
-                  );
-                }}
+                onPress={() => setIsDataProtectionOpen(true)}
                 style={styles.accountRowItem}
               >
                 <Text style={[styles.accountRowLabel, { color: theme.textPrimary }]}>
@@ -994,6 +1001,49 @@ export default function ProfileScreen() {
           </View>
 
           <ScrollView contentContainerStyle={styles.modalBody}>
+            {/* Profile Avatar Management Card */}
+            <View
+              style={[
+                styles.avatarDetailCard,
+                {
+                  backgroundColor: theme.surfaceCard,
+                  borderColor: theme.surfaceBorder,
+                },
+              ]}
+            >
+              <View style={styles.avatarDetailWrap}>
+                {user?.avatarUrl ? (
+                  <Image source={{ uri: user.avatarUrl }} style={styles.avatarDetailImg} />
+                ) : (
+                  <View
+                    style={[
+                      styles.avatarDetailPlaceholder,
+                      { backgroundColor: isLight ? '#E2E8F0' : '#1E2330' },
+                    ]}
+                  >
+                    <User size={30} color={theme.textMuted} />
+                  </View>
+                )}
+              </View>
+
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.textPrimary, marginBottom: 2 }}>
+                  Profile Picture
+                </Text>
+                <Text style={{ fontSize: 12, color: theme.textMuted, marginBottom: 8 }}>
+                  Clear facial photo builds trust with passengers & drivers
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setIsChangeAvatarOpen(true)}
+                  style={styles.changeAvatarBtnSmall}
+                >
+                  <Camera size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.changeAvatarBtnText}>Change Photo</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <Text style={[styles.formLabel, { color: theme.textPrimary }]}>Full Legal Name</Text>
             <TextInput
               style={[
@@ -2029,6 +2079,30 @@ export default function ProfileScreen() {
         visible={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
       />
+
+      {/* Terms and Conditions Modal */}
+      <TermsModal
+        visible={isTermsOpen}
+        onClose={() => setIsTermsOpen(false)}
+      />
+
+      {/* Data Protection Modal */}
+      <DataProtectionModal
+        visible={isDataProtectionOpen}
+        onClose={() => setIsDataProtectionOpen(false)}
+      />
+
+      {/* Help & Community Guide Modal */}
+      <CommunityGuideModal
+        visible={isCommunityGuideOpen}
+        onClose={() => setIsCommunityGuideOpen(false)}
+      />
+
+      {/* Change Avatar Modal */}
+      <ChangeAvatarModal
+        visible={isChangeAvatarOpen}
+        onClose={() => setIsChangeAvatarOpen(false)}
+      />
     </View>
   );
 }
@@ -2114,6 +2188,56 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarCameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FF7A00',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  avatarDetailCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  avatarDetailWrap: {
+    position: 'relative',
+  },
+  avatarDetailImg: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  avatarDetailPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  changeAvatarBtnSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#FF7A00',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  changeAvatarBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
   identityMeta: {
     flex: 1,

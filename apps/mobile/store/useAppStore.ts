@@ -162,6 +162,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
         AsyncStorage.setItem('@rideshare_home_state', profile.state);
       }
+      const customAvatar = await AsyncStorage.getItem('@rideshare_custom_avatar');
+      if (customAvatar && profile) {
+        profile.avatarUrl = customAvatar;
+      }
       set({ user: profile, isAuthenticated: true, isInitializing: false });
     } catch (err) {
       console.warn('Session restore failed or expired:', err);

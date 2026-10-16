@@ -7,12 +7,14 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, CheckCircle2, ChevronLeft } from 'lucide-react-native';
 import { useAppStore } from '../../store/useAppStore';
 import { Button } from '../../components/ui/Button';
+import { ChangeAvatarModal } from '../../components/ChangeAvatarModal';
 import { api } from '../../services/api';
 
 const genders = ['Woman', 'Man', 'Prefer not to say'];
@@ -23,6 +25,7 @@ export default function ProfileSetupScreen() {
   const [name, setName] = useState(user?.displayName || 'Alina Okafor');
   const [gender, setGender] = useState('Woman');
   const [nin, setNin] = useState('');
+  const [isChangeAvatarOpen, setIsChangeAvatarOpen] = useState(false);
 
   const isNinValid = useMemo(() => /^[0-9]{11}$/.test(nin), [nin]);
 
@@ -82,10 +85,23 @@ export default function ProfileSetupScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.avatarCard, { backgroundColor: theme.surfaceCard, borderColor: theme.surfaceBorder }]}> 
-          <View style={[styles.avatarCircle, { backgroundColor: theme.accentSoft }]}> 
-            <Text style={[styles.avatarText, { color: theme.textPrimary }]}>{(name || 'A').charAt(0).toUpperCase()}</Text>
-          </View>
-          <TouchableOpacity style={[styles.cameraButton, { backgroundColor: theme.primary }]}> 
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setIsChangeAvatarOpen(true)}
+            style={styles.avatarCircle}
+          >
+            {user?.avatarUrl ? (
+              <Image source={{ uri: user.avatarUrl }} style={styles.avatarImg} />
+            ) : (
+              <View style={[styles.avatarCircle, { backgroundColor: theme.accentSoft }]}> 
+                <Text style={[styles.avatarText, { color: theme.textPrimary }]}>{(name || 'A').charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setIsChangeAvatarOpen(true)}
+            style={[styles.cameraButton, { backgroundColor: theme.primary }]}
+          > 
             <Camera size={16} color={theme.primaryForeground} />
           </TouchableOpacity>
         </View>
@@ -146,6 +162,11 @@ export default function ProfileSetupScreen() {
 
         <Button title="Save profile" onPress={handleContinue} variant="dark" size="lg" style={styles.cta} />
       </ScrollView>
+
+      <ChangeAvatarModal
+        visible={isChangeAvatarOpen}
+        onClose={() => setIsChangeAvatarOpen(false)}
+      />
     </View>
   );
 }
@@ -192,6 +213,12 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImg: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   avatarText: {
     fontSize: 42,
