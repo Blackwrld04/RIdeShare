@@ -85,12 +85,37 @@ export default function WelcomeScreen() {
         styles.screen,
         {
           backgroundColor: isLight ? '#FFFFFF' : '#0B0D11',
-          paddingTop: Math.max(insets.top, 16),
-          paddingBottom: Math.max(insets.bottom, 16),
         },
       ]}
     >
-      <View style={styles.container}>
+      {/* Full-Page Background Image covering the entire screen */}
+      <Image
+        source={require('../assets/welcome_full_bg.jpg')}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+      />
+
+      {/* Subtle overlay to ensure maximum contrast and readability */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: isLight
+              ? 'rgba(255, 255, 255, 0.04)'
+              : 'rgba(11, 13, 17, 0.45)',
+          },
+        ]}
+      />
+
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: Math.max(insets.top, 16) + 4,
+            paddingBottom: Math.max(insets.bottom, 16) + 8,
+          },
+        ]}
+      >
         {/* Top Header with Progress Dash Indicators */}
         <View style={styles.topHeader}>
           {/* Subtle Brand Logo Mark */}
@@ -123,7 +148,7 @@ export default function WelcomeScreen() {
               style={[
                 styles.dashBar,
                 styles.dashBarInactive,
-                { backgroundColor: isLight ? '#E2E8F0' : '#272A34' },
+                { backgroundColor: isLight ? '#CBD5E1' : '#334155' },
               ]}
             />
           </View>
@@ -143,7 +168,7 @@ export default function WelcomeScreen() {
           <Text
             style={[
               styles.subtitle,
-              { color: isLight ? '#64748B' : '#94A3B8' },
+              { color: isLight ? '#334155' : '#CBD5E1' },
             ]}
           >
             Ride smarter with fast pickups, real-time tracking, and smooth travel
@@ -151,26 +176,8 @@ export default function WelcomeScreen() {
           </Text>
         </View>
 
-        {/* Photorealistic Hero Graphic: Car on City Map */}
-        <View style={styles.heroGraphicWrapper}>
-          <View
-            style={[
-              styles.heroImageFrame,
-              {
-                backgroundColor: isLight ? '#F8FAFC' : '#14161F',
-                borderColor: isLight
-                  ? 'rgba(0, 0, 0, 0.04)'
-                  : 'rgba(255, 255, 255, 0.08)',
-              },
-            ]}
-          >
-            <Image
-              source={require('../assets/welcome_car_hero.jpg')}
-              style={styles.heroImage}
-              resizeMode="cover"
-            />
-          </View>
-        </View>
+        {/* Flexible spacer: allows the luxury car and navigation route map in the background image to shine */}
+        <View style={styles.spacer} />
 
         {/* Bottom Action Area */}
         <View style={styles.bottomSection}>
@@ -181,7 +188,7 @@ export default function WelcomeScreen() {
             style={[
               styles.continuePill,
               {
-                backgroundColor: isLight ? '#0F172A' : '#141721',
+                backgroundColor: isLight ? '#111827' : '#141721',
                 borderColor: isLight
                   ? 'transparent'
                   : 'rgba(255, 255, 255, 0.1)',
@@ -204,7 +211,7 @@ export default function WelcomeScreen() {
             <Text
               style={[
                 styles.loginLinkText,
-                { color: isLight ? '#64748B' : '#94A3B8' },
+                { color: isLight ? '#334155' : '#94A3B8' },
               ]}
             >
               Already have an account?{' '}
@@ -494,27 +501,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontWeight: '500',
   },
-  heroGraphicWrapper: {
+  spacer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 12,
-  },
-  heroImageFrame: {
-    width: '100%',
-    height: Math.min(height * 0.44, 380),
-    borderRadius: 28,
-    overflow: 'hidden',
-    borderWidth: 1,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 4,
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
+    minHeight: 180,
   },
   bottomSection: {
     paddingTop: 8,
