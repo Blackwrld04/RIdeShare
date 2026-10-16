@@ -101,7 +101,7 @@ export default function WelcomeScreen() {
       {/* Full-Page Background Image covering the entire screen */}
       <Image
         source={require('../assets/welcome_screen_bg.jpg')}
-        style={StyleSheet.absoluteFill}
+        style={styles.backgroundImage}
         resizeMode="cover"
       />
 
@@ -451,6 +451,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     height: Platform.OS === 'web' ? ('100vh' as any) : '100%',
     maxHeight: Platform.OS === 'web' ? ('100vh' as any) : '100%',
+  },
+  backgroundImage: {
+    position: 'absolute',
+    top: -24,
+    left: 0,
+    right: 0,
+    bottom: -24,
   },
   container: {
     flex: 1,
