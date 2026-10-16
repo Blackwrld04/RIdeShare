@@ -503,8 +503,8 @@ const styles = StyleSheet.create({
     width: 48,
   },
   textContainer: {
-    marginTop: 4,
-    marginBottom: 8,
+    marginTop: 32,
+    marginBottom: 12,
   },
   headline: {
     fontSize: 32,
