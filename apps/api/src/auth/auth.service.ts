@@ -16,13 +16,23 @@ import { APP_CONFIG } from "../config.provider.js";
 import { DatabaseService } from "../infrastructure/database.service.js";
 import type {
   CreateSocialChallengeInput,
+  PasswordLoginInput,
   RefreshSessionInput,
+  RegisterCompleteInput,
+  RegisterRequestOtpInput,
   RequestOtpInput,
+  SetPasswordInput,
   SocialCredentialInput,
   SocialProvider,
   VerifyOtpInput,
 } from "./auth.schemas.js";
-import { createOtp, digestSecret, secretsMatch } from "./auth-crypto.js";
+import {
+  createOtp,
+  digestSecret,
+  hashPassword,
+  secretsMatch,
+  verifyPassword,
+} from "./auth-crypto.js";
 import { OtpDelivery } from "./otp-delivery.js";
 import { normalizeNigerianPhone } from "./phone-number.js";
 import {
@@ -673,4 +683,377 @@ export class AuthService {
       HttpStatus.TOO_MANY_REQUESTS,
     );
   }
+
+  async registerRequestOtp(
+    input: RegisterRequestOtpInput,
+  ): Promise<OtpChallengeResponse> {
+    const email = input.email.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      throw new BadRequestException("Please provide a valid email address");
+    }
+
+    // Explicit constraint check: No user should use the same email and no email should be used twice
+    const existing = await this.database.client.user.findFirst({
+      where: {
+        OR: [
+          { profile: { billingEmail: email } },
+          { socialAccounts: { some: { email } } },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        "An account with this email address already exists. Please log in instead.",
+      );
+    }
+
+    const hash = createHash("sha256").update(email).digest("hex");
+    const numericDigits = hash.replace(/\D/g, "").slice(0, 8).padEnd(8, "1");
+    const syntheticPhone = `+23480${numericDigits}`;
+
+    const now = new Date();
+    const cooldownStart = new Date(
+      now.getTime() - this.config.OTP_REQUEST_COOLDOWN_SECONDS * 1_000,
+    );
+    const windowStart = new Date(
+      now.getTime() - this.config.OTP_REQUEST_WINDOW_SECONDS * 1_000,
+    );
+
+    const [latest, requestCount] = await Promise.all([
+      this.database.client.phoneOtpChallenge.findFirst({
+        where: { phoneE164: syntheticPhone },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
+      this.database.client.phoneOtpChallenge.count({
+        where: { phoneE164: syntheticPhone, createdAt: { gte: windowStart } },
+      }),
+    ]);
+
+    if (latest && latest.createdAt > cooldownStart) {
+      const elapsedSeconds = Math.floor(
+        (now.getTime() - latest.createdAt.getTime()) / 1_000,
+      );
+      throw this.rateLimit(
+        Math.max(1, this.config.OTP_REQUEST_COOLDOWN_SECONDS - elapsedSeconds),
+      );
+    }
+
+    if (requestCount >= this.config.OTP_MAX_REQUESTS_PER_WINDOW) {
+      throw this.rateLimit(this.config.OTP_REQUEST_WINDOW_SECONDS);
+    }
+
+    const challengeId = randomUUID();
+    const code = randomInt(100_000, 999_999).toString();
+    const expiresAt = new Date(
+      now.getTime() + this.config.OTP_TTL_SECONDS * 1_000,
+    );
+    const codeDigest = digestSecret(
+      this.config.OTP_HMAC_SECRET,
+      `${challengeId}:${code}`,
+    );
+
+    await this.database.client.$transaction([
+      this.database.client.phoneOtpChallenge.updateMany({
+        where: { phoneE164: syntheticPhone, consumedAt: null },
+        data: { consumedAt: now },
+      }),
+      this.database.client.phoneOtpChallenge.create({
+        data: {
+          id: challengeId,
+          phoneE164: syntheticPhone,
+          codeDigest,
+          deliveryProvider: `smtp:${email}`,
+          expiresAt,
+          maxAttempts: this.config.OTP_MAX_ATTEMPTS,
+        },
+      }),
+    ]);
+
+    try {
+      await this.otpDelivery.send({
+        phoneE164: syntheticPhone,
+        email,
+        code,
+        expiresInSeconds: this.config.OTP_TTL_SECONDS,
+      });
+    } catch (deliveryError) {
+      console.error("[AuthService] Registration OTP delivery error:", deliveryError);
+      if (!this.config.OTP_DEV_CODE) {
+        await this.database.client.phoneOtpChallenge.updateMany({
+          where: { id: challengeId, consumedAt: null },
+          data: { consumedAt: new Date() },
+        });
+        throw new ServiceUnavailableException("Unable to send verification code email");
+      }
+    }
+
+    return {
+      challengeId,
+      expiresAt: expiresAt.toISOString(),
+      retryAfterSeconds: this.config.OTP_REQUEST_COOLDOWN_SECONDS,
+    };
+  }
+
+  async registerComplete(
+    input: RegisterCompleteInput,
+  ): Promise<AuthTokensResponse> {
+    const now = new Date();
+    const challenge = await this.database.client.phoneOtpChallenge.findUnique({
+      where: { id: input.challengeId },
+    });
+
+    if (
+      !challenge ||
+      challenge.consumedAt ||
+      challenge.expiresAt <= now ||
+      challenge.attempts >= challenge.maxAttempts
+    ) {
+      throw this.invalidOtp();
+    }
+
+    const suppliedDigest = digestSecret(
+      this.config.OTP_HMAC_SECRET,
+      `${challenge.id}:${input.code}`,
+    );
+
+    const isDevBypass =
+      Boolean(this.config.OTP_DEV_CODE) &&
+      input.code === this.config.OTP_DEV_CODE;
+
+    if (!secretsMatch(challenge.codeDigest, suppliedDigest) && !isDevBypass) {
+      const isFinalAttempt = challenge.attempts + 1 >= challenge.maxAttempts;
+      await this.database.client.phoneOtpChallenge.updateMany({
+        where: { id: challenge.id, consumedAt: null },
+        data: isFinalAttempt
+          ? { attempts: { increment: 1 }, consumedAt: now }
+          : { attempts: { increment: 1 } },
+      });
+      throw this.invalidOtp();
+    }
+
+    const deliveryEmail = challenge.deliveryProvider?.startsWith("smtp:")
+      ? challenge.deliveryProvider.slice(5).toLowerCase()
+      : null;
+
+    if (!deliveryEmail) {
+      throw new BadRequestException("Verification challenge has no associated email");
+    }
+
+    // Double check email uniqueness
+    const existingUserWithEmail = await this.database.client.user.findFirst({
+      where: {
+        OR: [
+          { profile: { billingEmail: deliveryEmail } },
+          { socialAccounts: { some: { email: deliveryEmail } } },
+        ],
+      },
+      select: { id: true },
+    });
+    if (existingUserWithEmail) {
+      throw new ConflictException(
+        "An account with this email address already exists. Please log in instead.",
+      );
+    }
+
+    let phoneE164 = challenge.phoneE164;
+    if (input.phone) {
+      try {
+        phoneE164 = normalizeNigerianPhone(input.phone);
+      } catch {}
+    }
+
+    const passwordHash = hashPassword(input.password);
+    const sessionId = randomUUID();
+    const refresh = this.tokens.createRefreshToken(sessionId);
+    const refreshExpiresAt = new Date(
+      now.getTime() +
+        this.config.AUTH_REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1_000,
+    );
+
+    const result = await this.database.client.$transaction(
+      async (transaction: any) => {
+        const claimed = await transaction.phoneOtpChallenge.updateMany({
+          where: {
+            id: challenge.id,
+            consumedAt: null,
+            expiresAt: { gt: now },
+            attempts: { lt: challenge.maxAttempts },
+          },
+          data: { consumedAt: now },
+        });
+
+        if (claimed.count !== 1) {
+          throw this.invalidOtp();
+        }
+
+        const displayName =
+          input.displayName?.trim() ||
+          deliveryEmail.split("@")[0] ||
+          "Commuter";
+
+        const user = await transaction.user.upsert({
+          where: { phoneE164 },
+          create: {
+            phoneE164,
+            phoneVerifiedAt: now,
+            passwordHash,
+            profile: {
+              create: {
+                displayName,
+                billingEmail: deliveryEmail,
+              },
+            },
+          },
+          update: {
+            phoneVerifiedAt: now,
+            passwordHash,
+            profile: {
+              upsert: {
+                create: {
+                  displayName,
+                  billingEmail: deliveryEmail,
+                },
+                update: {
+                  displayName,
+                  billingEmail: deliveryEmail,
+                },
+              },
+            },
+          },
+          include: { profile: true },
+        });
+
+        await transaction.authSession.create({
+          data: {
+            id: sessionId,
+            userId: user.id,
+            refreshTokenDigest: refresh.digest,
+            expiresAt: refreshExpiresAt,
+          },
+        });
+
+        return {
+          userId: user.id,
+          profileComplete: Boolean(user.profile?.displayName),
+        };
+      },
+    );
+
+    const accessToken = await this.tokens.createAccessToken({
+      userId: result.userId,
+      sessionId,
+    });
+
+    return {
+      accessToken,
+      accessTokenExpiresIn: this.config.AUTH_ACCESS_TOKEN_TTL_SECONDS,
+      refreshToken: refresh.token,
+      refreshTokenExpiresAt: refreshExpiresAt.toISOString(),
+      isNewUser: true,
+      profileComplete: result.profileComplete,
+    };
+  }
+
+  async passwordLogin(input: PasswordLoginInput): Promise<AuthTokensResponse> {
+    const raw = (input.email || input.identifier || "").trim().toLowerCase();
+    if (!raw) {
+      throw new BadRequestException("Email or phone is required");
+    }
+
+    const user = await this.database.client.user.findFirst({
+      where: {
+        OR: [
+          { profile: { billingEmail: raw } },
+          { socialAccounts: { some: { email: raw } } },
+          { phoneE164: raw },
+        ],
+      },
+      include: {
+        profile: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException("Invalid email or password.");
+    }
+
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        "No password has been set for this account yet. Please sign in with Email verification code, then set your password in Profile.",
+      );
+    }
+
+    const valid = verifyPassword(input.password, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException("Invalid email or password.");
+    }
+
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException("Account is not active");
+    }
+
+    const now = new Date();
+    const sessionId = randomUUID();
+    const refresh = this.tokens.createRefreshToken(sessionId);
+    const refreshExpiresAt = new Date(
+      now.getTime() +
+        this.config.AUTH_REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1_000,
+    );
+
+    await this.database.client.authSession.create({
+      data: {
+        id: sessionId,
+        userId: user.id,
+        refreshTokenDigest: refresh.digest,
+        expiresAt: refreshExpiresAt,
+      },
+    });
+
+    const accessToken = await this.tokens.createAccessToken({
+      userId: user.id,
+      sessionId,
+    });
+
+    return {
+      accessToken,
+      accessTokenExpiresIn: this.config.AUTH_ACCESS_TOKEN_TTL_SECONDS,
+      refreshToken: refresh.token,
+      refreshTokenExpiresAt: refreshExpiresAt.toISOString(),
+      isNewUser: false,
+      profileComplete: Boolean(user.profile?.displayName),
+    };
+  }
+
+  async setPassword(
+    userId: string,
+    input: SetPasswordInput,
+  ): Promise<{ success: boolean; message: string }> {
+    const user = await this.database.client.user.findUnique({
+      where: { id: userId },
+      select: { id: true, passwordHash: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException("User not found");
+    }
+
+    if (user.passwordHash && input.currentPassword) {
+      const match = verifyPassword(input.currentPassword, user.passwordHash);
+      if (!match) {
+        throw new BadRequestException("Current password does not match.");
+      }
+    }
+
+    const passwordHash = hashPassword(input.newPassword);
+    await this.database.client.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return { success: true, message: "Password updated successfully" };
+  }
 }
+

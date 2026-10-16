@@ -211,6 +211,76 @@ export const api = {
   },
 
   auth: {
+    login: async (email: string, password: string) => {
+      const res = await apiClient.post('/auth/login', {
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      const { accessToken, refreshToken, isNewUser, profileComplete } = res.data;
+      if (accessToken) {
+        await AsyncStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+      }
+      if (refreshToken) {
+        await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      }
+      return res.data;
+    },
+    registerRequestOtp: async (
+      email: string,
+      displayName?: string,
+    ): Promise<{ challengeId: string; expiresAt: string; retryAfterSeconds: number }> => {
+      const res = await apiClient.post('/auth/register/otp', {
+        email: email.trim().toLowerCase(),
+        displayName,
+      });
+      return res.data;
+    },
+    registerComplete: async (
+      challengeId: string,
+      code: string,
+      password: string,
+      displayName?: string,
+      phone?: string,
+    ) => {
+      const res = await apiClient.post('/auth/register/complete', {
+        challengeId,
+        code,
+        password,
+        displayName,
+        phone,
+      });
+      const { accessToken, refreshToken, isNewUser, profileComplete } = res.data;
+      if (accessToken) {
+        await AsyncStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+      }
+      if (refreshToken) {
+        await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      }
+      return res.data;
+    },
+    setPassword: async (newPassword: string, currentPassword?: string) => {
+      const res = await apiClient.post('/auth/password', {
+        newPassword,
+        currentPassword,
+      });
+      return res.data;
+    },
+    getSavedEmail: async (): Promise<string | null> => {
+      try {
+        return await AsyncStorage.getItem('@rideshare_saved_email');
+      } catch {
+        return null;
+      }
+    },
+    setSavedEmail: async (email: string | null) => {
+      try {
+        if (email) {
+          await AsyncStorage.setItem('@rideshare_saved_email', email);
+        } else {
+          await AsyncStorage.removeItem('@rideshare_saved_email');
+        }
+      } catch {}
+    },
     requestOtp: async (
       phoneOrEmail: string | { phone?: string; email?: string },
     ): Promise<{ challengeId: string; expiresAt: string; retryAfterSeconds: number }> => {

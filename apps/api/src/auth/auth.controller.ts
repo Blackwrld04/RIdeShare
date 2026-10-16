@@ -18,10 +18,18 @@ import {
 import {
   type CreateSocialChallengeInput,
   createSocialChallengeSchema,
+  type PasswordLoginInput,
+  passwordLoginSchema,
   type RefreshSessionInput,
+  type RegisterCompleteInput,
+  registerCompleteSchema,
+  type RegisterRequestOtpInput,
+  registerRequestOtpSchema,
   type RequestOtpInput,
   refreshSessionSchema,
   requestOtpSchema,
+  type SetPasswordInput,
+  setPasswordSchema,
   type SocialCredentialInput,
   type SocialProvider,
   socialCredentialSchema,
@@ -40,6 +48,44 @@ import {
 @Controller("auth")
 export class AuthController {
   constructor(@Inject(AuthService) private readonly auth: AuthService) {}
+
+  @Post("register/otp")
+  @HttpCode(202)
+  registerRequestOtp(
+    @Body(new ZodValidationPipe(registerRequestOtpSchema))
+    input: RegisterRequestOtpInput,
+  ): Promise<OtpChallengeResponse> {
+    return this.auth.registerRequestOtp(input);
+  }
+
+  @Post("register/complete")
+  @HttpCode(200)
+  registerComplete(
+    @Body(new ZodValidationPipe(registerCompleteSchema))
+    input: RegisterCompleteInput,
+  ): Promise<AuthTokensResponse> {
+    return this.auth.registerComplete(input);
+  }
+
+  @Post("login")
+  @HttpCode(200)
+  login(
+    @Body(new ZodValidationPipe(passwordLoginSchema))
+    input: PasswordLoginInput,
+  ): Promise<AuthTokensResponse> {
+    return this.auth.passwordLogin(input);
+  }
+
+  @Post("password")
+  @UseGuards(AccessTokenGuard)
+  @HttpCode(200)
+  setPassword(
+    @Req() request: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(setPasswordSchema))
+    input: SetPasswordInput,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.auth.setPassword(request.auth.userId, input);
+  }
 
   @Post("otp/request")
   @HttpCode(202)

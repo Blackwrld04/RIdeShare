@@ -226,25 +226,9 @@ export default function ProfileScreen() {
           },
         ]}
       >
-        <View style={styles.headerTopRow}>
-          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
-            Profile
-          </Text>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleLogout}
-            style={[
-              styles.headerLogoutBtn,
-              {
-                backgroundColor: isLight ? '#FEF2F2' : 'rgba(239, 68, 68, 0.12)',
-                borderColor: isLight ? '#FECACA' : 'rgba(239, 68, 68, 0.25)',
-              },
-            ]}
-          >
-            <LogOut size={14} color="#EF4444" />
-            <Text style={styles.headerLogoutText}>Log out</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
+          Profile
+        </Text>
 
         {/* 2-Tab Segmented Switch: About you | Account */}
         <View style={styles.topTabBar}>
@@ -977,10 +961,8 @@ export default function ProfileScreen() {
                 },
               ]}
             >
-              <LogOut size={18} color="#EF4444" style={{ marginRight: 8 }} />
-              <Text style={styles.logoutText}>
-                Log out
-              </Text>
+              <LogOut size={18} color="#EF4444" />
+              <Text style={styles.logoutText}>Log out</Text>
             </TouchableOpacity>
 
             <View style={styles.footerVersionBox}>
@@ -2367,15 +2349,19 @@ const styles = StyleSheet.create({
   },
 
   logoutRow: {
-    paddingVertical: 14,
-    marginTop: 6,
-    marginBottom: 20,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 24,
+    gap: 8,
   },
   logoutText: {
     fontSize: 16,
     fontWeight: '800',
+    color: '#EF4444',
   },
   footerVersionBox: {
     alignItems: 'center',

@@ -7,7 +7,9 @@ import {
   createOtp,
   createRefreshSecret,
   digestSecret,
+  hashPassword,
   secretsMatch,
+  verifyPassword,
 } from "./auth-crypto.js";
 
 describe("auth crypto", () => {
@@ -32,6 +34,15 @@ describe("auth crypto", () => {
     expect(createRefreshSecret()).toMatch(/^[A-Za-z0-9_-]{43}$/);
   });
 
+  it("hashes and securely verifies passwords", () => {
+    const pwd = "SecurePassword123!";
+    const hash = hashPassword(pwd);
+    expect(hash).toContain(":");
+    expect(verifyPassword(pwd, hash)).toBe(true);
+    expect(verifyPassword("WrongPassword!", hash)).toBe(false);
+    expect(verifyPassword(pwd, "")).toBe(false);
+  });
+
   it("validates social challenges and bounded identity tokens", () => {
     expect(createSocialChallengeSchema.parse({ provider: "google" })).toEqual({
       provider: "google",
@@ -45,3 +56,4 @@ describe("auth crypto", () => {
     ).toBe(true);
   });
 });
+

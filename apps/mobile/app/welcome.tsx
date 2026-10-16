@@ -44,10 +44,17 @@ export default function WelcomeScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     setShowSheet(false);
-    router.push({
-      pathname: '/auth/otp',
-      params: { method },
-    });
+    if (method === 'email') {
+      router.push({
+        pathname: '/auth/otp',
+        params: { mode: 'signup', method: 'email' },
+      });
+    } else {
+      router.push({
+        pathname: '/auth/otp',
+        params: { mode: 'otp_fallback', method: 'phone' },
+      });
+    }
   };
 
   const handleLoginExisting = () => {
@@ -55,7 +62,10 @@ export default function WelcomeScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     setShowSheet(false);
-    router.push('/auth/otp');
+    router.push({
+      pathname: '/auth/otp',
+      params: { mode: 'login' },
+    });
   };
 
   const handleOpenRegister = () => {
@@ -63,7 +73,10 @@ export default function WelcomeScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     setShowSheet(false);
-    router.push('/auth/register');
+    router.push({
+      pathname: '/auth/otp',
+      params: { mode: 'signup' },
+    });
   };
 
   return (
