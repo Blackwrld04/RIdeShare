@@ -88,24 +88,6 @@ export default function WelcomeScreen() {
         },
       ]}
     >
-      {/* Full-Page Background Image covering the entire screen */}
-      <Image
-        source={require('../assets/welcome_full_bg.jpg')}
-        style={StyleSheet.absoluteFill}
-        resizeMode="cover"
-      />
-
-      {/* Subtle overlay to ensure maximum contrast and readability */}
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            backgroundColor: isLight
-              ? 'rgba(255, 255, 255, 0.04)'
-              : 'rgba(11, 13, 17, 0.45)',
-          },
-        ]}
-      />
 
       <View
         style={[
@@ -176,8 +158,14 @@ export default function WelcomeScreen() {
           </Text>
         </View>
 
-        {/* Flexible spacer: allows the luxury car and navigation route map in the background image to shine */}
-        <View style={styles.spacer} />
+        {/* Center Graphic: The White Luxury Car on City Route Map centered */}
+        <View style={styles.centerGraphicContainer}>
+          <Image
+            source={require('../assets/welcome_car_centered.jpg')}
+            style={styles.centerCarImage}
+            resizeMode="contain"
+          />
+        </View>
 
         {/* Bottom Action Area */}
         <View style={styles.bottomSection}>
@@ -438,18 +426,22 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    overflow: 'hidden',
+    height: Platform.OS === 'web' ? ('100vh' as any) : '100%',
+    maxHeight: Platform.OS === 'web' ? ('100vh' as any) : '100%',
   },
   container: {
     flex: 1,
     paddingHorizontal: 24,
     justifyContent: 'space-between',
+    overflow: 'hidden',
   },
   topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 8,
-    marginBottom: 16,
+    paddingTop: 6,
+    marginBottom: 12,
   },
   brandRow: {
     flexDirection: 'row',
@@ -482,41 +474,51 @@ const styles = StyleSheet.create({
     width: 48,
   },
   textContainer: {
-    marginTop: 8,
-    marginBottom: 12,
+    marginTop: 4,
+    marginBottom: 8,
   },
   headline: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: '900',
-    letterSpacing: -1,
-    lineHeight: 44,
+    letterSpacing: -0.8,
+    lineHeight: 38,
   },
   italicCity: {
     fontStyle: 'italic',
     fontWeight: '900',
   },
   subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 12,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6,
     fontWeight: '500',
   },
-  spacer: {
+  centerGraphicContainer: {
     flex: 1,
-    minHeight: 180,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    overflow: 'hidden',
+    paddingVertical: 2,
+  },
+  centerCarImage: {
+    width: '100%',
+    height: '100%',
+    maxWidth: 420,
+    maxHeight: Math.min(height * 0.44, 340),
   },
   bottomSection: {
-    paddingTop: 8,
-    paddingBottom: 6,
-    gap: 14,
+    paddingTop: 6,
+    paddingBottom: 4,
+    gap: 12,
   },
   continuePill: {
-    height: 64,
-    borderRadius: 32,
+    height: 60,
+    borderRadius: 30,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingLeft: 28,
+    paddingLeft: 26,
     paddingRight: 8,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
