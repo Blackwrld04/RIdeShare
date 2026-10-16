@@ -5,42 +5,45 @@ import {
   Text,
   TouchableOpacity,
   Dimensions,
-  ScrollView,
   Image,
+  Modal,
+  Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  Phone,
-  Mail,
   ChevronRight,
+  Mail,
+  Phone,
+  UserPlus,
+  X,
   ShieldCheck,
-  CheckCircle2,
-  MapPin,
-  TrendingDown,
-  Users,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../store/useAppStore';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const { theme, themeMode } = useAppStore();
-  const [showMethods, setShowMethods] = useState(false);
+  const [showSheet, setShowSheet] = useState(false);
 
-  const handleStart = () => {
+  const isLight = themeMode === 'light';
+
+  const handleOpenSheet = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
-    setShowMethods(true);
+    setShowSheet(true);
   };
 
   const handleChooseMethod = (method: 'phone' | 'email') => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
+    setShowSheet(false);
     router.push({
       pathname: '/auth/otp',
       params: { method },
@@ -48,343 +51,366 @@ export default function WelcomeScreen() {
   };
 
   const handleLoginExisting = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    setShowSheet(false);
     router.push('/auth/otp');
   };
 
-  const isLight = themeMode === 'light';
+  const handleOpenRegister = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    setShowSheet(false);
+    router.push('/auth/register');
+  };
 
   return (
     <View
       style={[
         styles.screen,
         {
-          backgroundColor: isLight ? '#F8FAFC' : '#0A0B0E',
-          paddingTop: Math.max(insets.top, 20),
-          paddingBottom: Math.max(insets.bottom, 20) + 10,
+          backgroundColor: isLight ? '#FFFFFF' : '#0B0D11',
+          paddingTop: Math.max(insets.top, 16),
+          paddingBottom: Math.max(insets.bottom, 16),
         },
       ]}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Brand Top Header */}
-        <View style={styles.brandRow}>
-          <View style={styles.brandLeft}>
+      <View style={styles.container}>
+        {/* Top Header with Progress Dash Indicators */}
+        <View style={styles.topHeader}>
+          {/* Subtle Brand Logo Mark */}
+          <View style={styles.brandRow}>
             <Image
               source={require('../assets/icon.png')}
-              style={styles.headerLogoMini}
+              style={styles.logoMark}
               resizeMode="contain"
             />
-            <Text style={[styles.brandTitle, { color: isLight ? '#0F172A' : '#FFFFFF' }]}>
-              Ride<Text style={{ color: '#10B981' }}>Share</Text>
+            <Text
+              style={[
+                styles.brandName,
+                { color: isLight ? '#0F172A' : '#FFFFFF' },
+              ]}
+            >
+              Ride<Text style={{ color: '#E06B26' }}>Share</Text>
             </Text>
+          </View>
+
+          {/* Minimalist 2-Segment Indicator Bar */}
+          <View style={styles.dashIndicatorRow}>
+            <View
+              style={[
+                styles.dashBar,
+                styles.dashBarActive,
+                { backgroundColor: isLight ? '#0F172A' : '#FFFFFF' },
+              ]}
+            />
+            <View
+              style={[
+                styles.dashBar,
+                styles.dashBarInactive,
+                { backgroundColor: isLight ? '#E2E8F0' : '#272A34' },
+              ]}
+            />
           </View>
         </View>
 
-        {!showMethods ? (
-          /* Step 1: Splash / Welcome Hero Card */
-          <View style={styles.heroContainer}>
-            {/* Primary Hero Card Matching App Design */}
-            <View
+        {/* Hero Typography */}
+        <View style={styles.textContainer}>
+          <Text
+            style={[
+              styles.headline,
+              { color: isLight ? '#0F172A' : '#FFFFFF' },
+            ]}
+          >
+            Your <Text style={styles.italicCity}>City</Text>,{'\n'}One Tap Away
+          </Text>
+
+          <Text
+            style={[
+              styles.subtitle,
+              { color: isLight ? '#64748B' : '#94A3B8' },
+            ]}
+          >
+            Ride smarter with fast pickups, real-time tracking, and smooth travel
+            anywhere in the city.
+          </Text>
+        </View>
+
+        {/* Photorealistic Hero Graphic: Car on City Map */}
+        <View style={styles.heroGraphicWrapper}>
+          <View
+            style={[
+              styles.heroImageFrame,
+              {
+                backgroundColor: isLight ? '#F8FAFC' : '#14161F',
+                borderColor: isLight
+                  ? 'rgba(0, 0, 0, 0.04)'
+                  : 'rgba(255, 255, 255, 0.08)',
+              },
+            ]}
+          >
+            <Image
+              source={require('../assets/welcome_car_hero.jpg')}
+              style={styles.heroImage}
+              resizeMode="cover"
+            />
+          </View>
+        </View>
+
+        {/* Bottom Action Area */}
+        <View style={styles.bottomSection}>
+          {/* Main Continue Pill Button matching Reference Photo */}
+          <TouchableOpacity
+            activeOpacity={0.88}
+            onPress={handleOpenSheet}
+            style={[
+              styles.continuePill,
+              {
+                backgroundColor: isLight ? '#0F172A' : '#141721',
+                borderColor: isLight
+                  ? 'transparent'
+                  : 'rgba(255, 255, 255, 0.1)',
+                borderWidth: isLight ? 0 : 1,
+              },
+            ]}
+          >
+            <Text style={styles.continueText}>Continue</Text>
+            <View style={styles.arrowCircle}>
+              <ChevronRight size={22} color="#FFFFFF" strokeWidth={2.6} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Secondary Quick Log-in Link */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleLoginExisting}
+            style={styles.loginLink}
+          >
+            <Text
               style={[
-                styles.heroCard,
-                {
-                  backgroundColor: isLight ? '#FFFFFF' : '#14161C',
-                  borderColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.08)',
-                },
+                styles.loginLinkText,
+                { color: isLight ? '#64748B' : '#94A3B8' },
               ]}
             >
-              {/* Prominent App Logo */}
-              <View style={styles.logoWrapper}>
-                <View
-                  style={[
-                    styles.logoContainer,
-                    {
-                      backgroundColor: isLight ? '#F1F5F9' : '#1C1F28',
-                      borderColor: isLight ? '#CBD5E1' : 'rgba(16, 185, 129, 0.25)',
-                    },
-                  ]}
-                >
-                  <Image
-                    source={require('../assets/icon.png')}
-                    style={styles.heroLogoImage}
-                    resizeMode="contain"
-                  />
-                </View>
-              </View>
-
+              Already have an account?{' '}
               <Text
                 style={[
-                  styles.heroCardHeading,
+                  styles.loginLinkHighlight,
                   { color: isLight ? '#0F172A' : '#FFFFFF' },
                 ]}
               >
-                Safe, verified carpooling across Nigeria
+                Log In
               </Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
-              <Text
+      {/* Sleek Method Selection Bottom Sheet */}
+      <Modal
+        visible={showSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSheet(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowSheet(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View
                 style={[
-                  styles.heroCardSubtext,
-                  { color: isLight ? '#64748B' : '#94A3B8' },
-                ]}
-              >
-                Share empty seats on daily inter-city commutes. Split fuel costs, beat highway surge fares, and travel safely with NIMC NIN-verified Nigerians.
-              </Text>
-
-              {/* Feature Highlights Grid */}
-              <View style={styles.featuresList}>
-                <View
-                  style={[
-                    styles.featureItem,
-                    {
-                      backgroundColor: isLight ? '#F8FAFC' : '#1C1E26',
-                      borderColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.06)',
-                    },
-                  ]}
-                >
-                  <View style={[styles.featureIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
-                    <ShieldCheck size={18} color="#10B981" />
-                  </View>
-                  <View style={styles.featureTextBox}>
-                    <Text style={[styles.featureTitle, { color: isLight ? '#0F172A' : '#FFFFFF' }]}>
-                      NIMC NIN Identity Verified
-                    </Text>
-                    <Text style={[styles.featureSub, { color: isLight ? '#64748B' : '#94A3B8' }]}>
-                      Every driver and passenger is authenticated via national database.
-                    </Text>
-                  </View>
-                </View>
-
-                <View
-                  style={[
-                    styles.featureItem,
-                    {
-                      backgroundColor: isLight ? '#F8FAFC' : '#1C1E26',
-                      borderColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.06)',
-                    },
-                  ]}
-                >
-                  <View style={[styles.featureIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
-                    <TrendingDown size={18} color="#F59E0B" />
-                  </View>
-                  <View style={styles.featureTextBox}>
-                    <Text style={[styles.featureTitle, { color: isLight ? '#0F172A' : '#FFFFFF' }]}>
-                      Beat Highway Surge Fares
-                    </Text>
-                    <Text style={[styles.featureSub, { color: isLight ? '#64748B' : '#94A3B8' }]}>
-                      Fixed, fair fuel-split rates on Berger, Lekki, Kubwa & expressway corridors.
-                    </Text>
-                  </View>
-                </View>
-
-                <View
-                  style={[
-                    styles.featureItem,
-                    {
-                      backgroundColor: isLight ? '#F8FAFC' : '#1C1E26',
-                      borderColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.06)',
-                    },
-                  ]}
-                >
-                  <View style={[styles.featureIconBox, { backgroundColor: 'rgba(56, 189, 248, 0.12)' }]}>
-                    <MapPin size={18} color="#38BDF8" />
-                  </View>
-                  <View style={styles.featureTextBox}>
-                    <Text style={[styles.featureTitle, { color: isLight ? '#0F172A' : '#FFFFFF' }]}>
-                      All 36 States & FCT Abuja
-                    </Text>
-                    <Text style={[styles.featureSub, { color: isLight ? '#64748B' : '#94A3B8' }]}>
-                      Customized landmark stops and inter-city routes nationwide.
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            {/* Action Buttons */}
-            <View style={styles.actionsContainer}>
-              <TouchableOpacity
-                activeOpacity={0.88}
-                onPress={handleStart}
-                style={[
-                  styles.primaryPillBtn,
+                  styles.sheetContainer,
                   {
-                    backgroundColor: isLight ? '#0F172A' : '#FFFFFF',
+                    backgroundColor: isLight ? '#FFFFFF' : '#141721',
+                    paddingBottom: Math.max(insets.bottom, 20) + 12,
                   },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.primaryPillBtnText,
-                    { color: isLight ? '#FFFFFF' : '#0A0B0E' },
-                  ]}
+                {/* Pull-down drag bar */}
+                <View style={styles.dragHandle} />
+
+                {/* Sheet Title */}
+                <View style={styles.sheetHeader}>
+                  <Text
+                    style={[
+                      styles.sheetTitle,
+                      { color: isLight ? '#0F172A' : '#FFFFFF' },
+                    ]}
+                  >
+                    Get moving with RideShare
+                  </Text>
+                  <Text
+                    style={[
+                      styles.sheetSubtitle,
+                      { color: isLight ? '#64748B' : '#94A3B8' },
+                    ]}
+                  >
+                    Choose your preferred sign-in method
+                  </Text>
+                </View>
+
+                {/* Options List */}
+                <View style={styles.methodsList}>
+                  {/* Option 1: Email Address */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleChooseMethod('email')}
+                    style={[
+                      styles.methodRow,
+                      {
+                        backgroundColor: isLight ? '#F8FAFC' : '#1C1F2B',
+                        borderColor: isLight
+                          ? '#E2E8F0'
+                          : 'rgba(255, 255, 255, 0.08)',
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.methodIconBadge,
+                        { backgroundColor: 'rgba(224, 107, 38, 0.12)' },
+                      ]}
+                    >
+                      <Mail size={20} color="#E06B26" />
+                    </View>
+                    <View style={styles.methodInfo}>
+                      <Text
+                        style={[
+                          styles.methodName,
+                          { color: isLight ? '#0F172A' : '#FFFFFF' },
+                        ]}
+                      >
+                        Continue with Email Address
+                      </Text>
+                      <Text
+                        style={[
+                          styles.methodDesc,
+                          { color: isLight ? '#64748B' : '#94A3B8' },
+                        ]}
+                      >
+                        Verification code sent to your inbox
+                      </Text>
+                    </View>
+                    <ChevronRight
+                      size={18}
+                      color={isLight ? '#94A3B8' : '#64748B'}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Option 2: Nigerian Mobile Phone */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleChooseMethod('phone')}
+                    style={[
+                      styles.methodRow,
+                      {
+                        backgroundColor: isLight ? '#F8FAFC' : '#1C1F2B',
+                        borderColor: isLight
+                          ? '#E2E8F0'
+                          : 'rgba(255, 255, 255, 0.08)',
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.methodIconBadge,
+                        { backgroundColor: 'rgba(16, 185, 129, 0.12)' },
+                      ]}
+                    >
+                      <Phone size={20} color="#10B981" />
+                    </View>
+                    <View style={styles.methodInfo}>
+                      <Text
+                        style={[
+                          styles.methodName,
+                          { color: isLight ? '#0F172A' : '#FFFFFF' },
+                        ]}
+                      >
+                        Continue with Nigerian Phone (+234)
+                      </Text>
+                      <Text
+                        style={[
+                          styles.methodDesc,
+                          { color: isLight ? '#64748B' : '#94A3B8' },
+                        ]}
+                      >
+                        Instant SMS OTP verification
+                      </Text>
+                    </View>
+                    <ChevronRight
+                      size={18}
+                      color={isLight ? '#94A3B8' : '#64748B'}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Option 3: Full Multi-Step Registration */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={handleOpenRegister}
+                    style={[
+                      styles.methodRow,
+                      {
+                        backgroundColor: isLight ? '#F8FAFC' : '#1C1F2B',
+                        borderColor: isLight
+                          ? '#E2E8F0'
+                          : 'rgba(255, 255, 255, 0.08)',
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.methodIconBadge,
+                        { backgroundColor: 'rgba(56, 189, 248, 0.12)' },
+                      ]}
+                    >
+                      <UserPlus size={20} color="#0284C7" />
+                    </View>
+                    <View style={styles.methodInfo}>
+                      <Text
+                        style={[
+                          styles.methodName,
+                          { color: isLight ? '#0F172A' : '#FFFFFF' },
+                        ]}
+                      >
+                        Create New Commuter / Driver Account
+                      </Text>
+                      <Text
+                        style={[
+                          styles.methodDesc,
+                          { color: isLight ? '#64748B' : '#94A3B8' },
+                        ]}
+                      >
+                        Step-by-step verified onboarding
+                      </Text>
+                    </View>
+                    <ChevronRight
+                      size={18}
+                      color={isLight ? '#94A3B8' : '#64748B'}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Cancel / Dismiss button */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setShowSheet(false)}
+                  style={styles.sheetCancelBtn}
                 >
-                  Get Started
-                </Text>
-                <ChevronRight size={18} color={isLight ? '#FFFFFF' : '#0A0B0E'} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={handleLoginExisting}
-                style={styles.loginLinkBtn}
-              >
-                <Text style={[styles.loginLinkText, { color: isLight ? '#0F172A' : '#FFFFFF' }]}>
-                  Already have an account? <Text style={{ color: '#10B981', fontWeight: '800' }}>Log In</Text>
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={[styles.versionText, { color: isLight ? '#94A3B8' : '#64748B' }]}>
-              RideShare Nigeria v2.4.0 • Encrypted & Escrow Protected
-            </Text>
+                  <Text
+                    style={[
+                      styles.sheetCancelText,
+                      { color: isLight ? '#64748B' : '#94A3B8' },
+                    ]}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        ) : (
-          /* Step 2: Choose Sign-up Method Screen */
-          <View style={styles.methodsContainer}>
-            <View style={styles.methodsHeaderBox}>
-              <Text
-                style={[
-                  styles.methodsHeading,
-                  { color: isLight ? '#0F172A' : '#FFFFFF' },
-                ]}
-              >
-                How do you want to continue?
-              </Text>
-              <Text
-                style={[
-                  styles.methodsSubheading,
-                  { color: isLight ? '#64748B' : '#94A3B8' },
-                ]}
-              >
-                Choose your preferred method to create your account or log in to RideShare.
-              </Text>
-            </View>
-
-            {/* Option 1: Continue with Phone */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => handleChooseMethod('phone')}
-              style={[
-                styles.methodItem,
-                {
-                  backgroundColor: isLight ? '#FFFFFF' : '#14161C',
-                  borderColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.08)',
-                },
-              ]}
-            >
-              <View style={[styles.methodIconWrapper, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
-                <Phone size={22} color="#10B981" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[
-                    styles.methodTitle,
-                    { color: isLight ? '#0F172A' : '#FFFFFF' },
-                  ]}
-                >
-                  Continue with Nigerian Phone (+234)
-                </Text>
-                <Text
-                  style={[
-                    styles.methodSub,
-                    { color: isLight ? '#64748B' : '#94A3B8' },
-                  ]}
-                >
-                  Instant SMS OTP verification
-                </Text>
-              </View>
-              <ChevronRight size={20} color={isLight ? '#94A3B8' : '#64748B'} />
-            </TouchableOpacity>
-
-            {/* Option 2: Continue with Email */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => handleChooseMethod('email')}
-              style={[
-                styles.methodItem,
-                {
-                  backgroundColor: isLight ? '#FFFFFF' : '#14161C',
-                  borderColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.08)',
-                },
-              ]}
-            >
-              <View style={[styles.methodIconWrapper, { backgroundColor: 'rgba(56, 189, 248, 0.12)' }]}>
-                <Mail size={22} color="#38BDF8" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[
-                    styles.methodTitle,
-                    { color: isLight ? '#0F172A' : '#FFFFFF' },
-                  ]}
-                >
-                  Continue with Email Address
-                </Text>
-                <Text
-                  style={[
-                    styles.methodSub,
-                    { color: isLight ? '#64748B' : '#94A3B8' },
-                  ]}
-                >
-                  Work or personal email authentication
-                </Text>
-              </View>
-              <ChevronRight size={20} color={isLight ? '#94A3B8' : '#64748B'} />
-            </TouchableOpacity>
-
-            {/* Back to Hero */}
-            <TouchableOpacity
-              onPress={() => setShowMethods(false)}
-              style={styles.backToWelcomeBtn}
-            >
-              <Text style={[styles.backToWelcomeText, { color: isLight ? '#64748B' : '#94A3B8' }]}>
-                ← Back to welcome screen
-              </Text>
-            </TouchableOpacity>
-
-            {/* Already a member */}
-            <View style={styles.alreadyMemberSection}>
-              <Text
-                style={[
-                  styles.alreadyMemberTitle,
-                  { color: isLight ? '#0F172A' : '#FFFFFF' },
-                ]}
-              >
-                Already have an account?
-              </Text>
-              <TouchableOpacity onPress={handleLoginExisting}>
-                <Text style={styles.loginGreenText}>Log in with OTP</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Direct multi-step register option */}
-            <View style={{ alignItems: 'center', marginBottom: 14 }}>
-              <TouchableOpacity onPress={() => router.push('/auth/register')}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: isLight ? '#64748B' : '#94A3B8' }}>
-                  New here? <Text style={{ color: '#10B981', fontWeight: '700' }}>Complete Full Registration</Text>
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Legal Notice */}
-            <View
-              style={[
-                styles.legalNoticeContainer,
-                { borderTopColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.08)' },
-              ]}
-            >
-              <Text style={[styles.legalNoticeText, { color: isLight ? '#64748B' : '#94A3B8' }]}>
-                By signing up, you accept our <Text style={styles.legalLink}>Terms of Service</Text> and <Text style={styles.legalLink}>Community Guidelines</Text>.
-              </Text>
-              <Text style={[styles.legalNoticeText, { color: isLight ? '#64748B' : '#94A3B8', marginTop: 8 }]}>
-                All payments are securely processed through Paystack Escrow. Drivers receive automated 24h bank settlement upon trip completion.
-              </Text>
-            </View>
-          </View>
-        )}
-      </ScrollView>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }
@@ -393,258 +419,213 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    flexGrow: 1,
+  container: {
+    flex: 1,
+    paddingHorizontal: 24,
     justifyContent: 'space-between',
+  },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    marginBottom: 16,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    gap: 8,
   },
-  brandLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerLogoMini: {
-    width: 32,
-    height: 32,
+  logoMark: {
+    width: 28,
+    height: 28,
     borderRadius: 8,
   },
-  brandTitle: {
-    fontSize: 22,
+  brandName: {
+    fontSize: 19,
     fontWeight: '900',
-    letterSpacing: -0.6,
+    letterSpacing: -0.4,
   },
-  countryTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  countryText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  heroContainer: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  heroCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 22,
-    marginBottom: 24,
-    alignItems: 'center',
-  },
-  logoWrapper: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  logoContainer: {
-    width: 84,
-    height: 84,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  heroLogoImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-  },
-  glowingBadge: {
+  dashIndicatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 16,
   },
-  glowingBadgeText: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: '700',
+  dashBar: {
+    height: 3.5,
+    borderRadius: 2,
   },
-  heroCardHeading: {
-    fontSize: 24,
-    fontWeight: '800',
-    textAlign: 'center',
-    letterSpacing: -0.6,
-    marginBottom: 10,
+  dashBarActive: {
+    width: 48,
   },
-  heroCardSubtext: {
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: 'center',
-    marginBottom: 20,
+  dashBarInactive: {
+    width: 48,
   },
-  featuresList: {
-    width: '100%',
-    gap: 10,
+  textContainer: {
+    marginTop: 8,
+    marginBottom: 12,
   },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 12,
+  headline: {
+    fontSize: 36,
+    fontWeight: '900',
+    letterSpacing: -1,
+    lineHeight: 44,
   },
-  featureIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+  italicCity: {
+    fontStyle: 'italic',
+    fontWeight: '900',
   },
-  featureTextBox: {
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 12,
+    fontWeight: '500',
+  },
+  heroGraphicWrapper: {
     flex: 1,
-  },
-  featureTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  featureSub: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  actionsContainer: {
-    width: '100%',
-    gap: 12,
-  },
-  primaryPillBtn: {
-    height: 56,
-    borderRadius: 28,
-    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    marginVertical: 12,
+  },
+  heroImageFrame: {
+    width: '100%',
+    height: Math.min(height * 0.44, 380),
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: 1,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
     elevation: 4,
   },
-  primaryPillBtnText: {
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 0.2,
+  heroImage: {
+    width: '100%',
+    height: '100%',
   },
-  loginLinkBtn: {
-    paddingVertical: 10,
+  bottomSection: {
+    paddingTop: 8,
+    paddingBottom: 6,
+    gap: 14,
+  },
+  continuePill: {
+    height: 64,
+    borderRadius: 32,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: 28,
+    paddingRight: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 5,
+  },
+  continueText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  arrowCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E06B26',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#E06B26',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  loginLink: {
+    alignItems: 'center',
+    paddingVertical: 4,
   },
   loginLinkText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  exploreLinkBtn: {
-    paddingVertical: 4,
-    alignItems: 'center',
-  },
-  exploreText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  versionText: {
-    textAlign: 'center',
-    fontSize: 11,
-    marginTop: 18,
-    marginBottom: 6,
-  },
-  methodsContainer: {
-    flex: 1,
-  },
-  methodsHeaderBox: {
-    marginBottom: 24,
-    marginTop: 6,
-  },
-  methodsHeading: {
-    fontSize: 26,
+  loginLinkHighlight: {
     fontWeight: '800',
-    letterSpacing: -0.6,
-    marginBottom: 8,
+    textDecorationLine: 'underline',
   },
-  methodsSubheading: {
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.52)',
+    justifyContent: 'flex-end',
+  },
+  sheetContainer: {
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 22,
+    paddingTop: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  dragHandle: {
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(150, 150, 150, 0.4)',
+    alignSelf: 'center',
+    marginBottom: 18,
+  },
+  sheetHeader: {
+    marginBottom: 20,
+  },
+  sheetTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    marginBottom: 4,
+  },
+  sheetSubtitle: {
     fontSize: 14,
-    lineHeight: 20,
   },
-  methodItem: {
+  methodsList: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  methodRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 18,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
-    marginBottom: 14,
+    gap: 14,
   },
-  methodIconWrapper: {
-    width: 46,
-    height: 46,
+  methodIconBadge: {
+    width: 44,
+    height: 44,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
   },
-  methodTitle: {
+  methodInfo: {
+    flex: 1,
+  },
+  methodName: {
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 2,
   },
-  methodSub: {
+  methodDesc: {
     fontSize: 12,
   },
-  backToWelcomeBtn: {
+  sheetCancelBtn: {
+    alignItems: 'center',
     paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 8,
   },
-  backToWelcomeText: {
+  sheetCancelText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  alreadyMemberSection: {
-    marginTop: 18,
-    marginBottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  alreadyMemberTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  loginGreenText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#10B981',
-  },
-  legalNoticeContainer: {
-    borderTopWidth: 1,
-    paddingTop: 16,
-    marginTop: 'auto',
-  },
-  legalNoticeText: {
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  legalLink: {
-    color: '#10B981',
-    textDecorationLine: 'underline',
   },
 });
