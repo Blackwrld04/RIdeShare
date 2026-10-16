@@ -18,7 +18,6 @@ import { useAppStore } from '../../store/useAppStore';
 import { HeaderGradient } from '../../components/ui/HeaderGradient';
 import { RouteCard } from '../../components/ui/RouteCard';
 import { RideCard } from '../../components/ui/RideCard';
-import { HeroCarousel } from '../../components/ui/HeroCarousel';
 import { getCorridorsForState, type NigerianCorridor } from '../../constants/theme';
 
 export default function HomeScreen() {
@@ -59,8 +58,6 @@ export default function HomeScreen() {
             <RouteCard onSearchPress={() => router.push('/(tabs)/search')} />
           </View>
         </HeaderGradient>
-
-        <HeroCarousel />
 
         {/* Best Rides Section (Screen 1 Inspiration) */}
         <View style={styles.sectionContainer}>

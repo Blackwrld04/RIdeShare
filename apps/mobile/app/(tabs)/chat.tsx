@@ -124,30 +124,14 @@ export default function ChatListScreen() {
                   </View>
 
                   <View style={styles.chatCol}>
-                    <View style={styles.chatTopLine}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                        <Text numberOfLines={1} style={[styles.driverName, { color: theme.textPrimary }]}>
-                          {chat.driverName}
-                        </Text>
-                        <View style={styles.ratingPill}>
-                          <Star size={10} color="#FF7A00" fill="#FF7A00" />
-                          <Text style={styles.ratingText}>{chat.driverRating.toFixed(2)}</Text>
-                        </View>
+                    <View style={styles.chatNameRow}>
+                      <Text numberOfLines={1} style={[styles.driverName, { color: theme.textPrimary }]}>
+                        {chat.driverName}
+                      </Text>
+                      <View style={styles.ratingPill}>
+                        <Star size={10} color="#FF7A00" fill="#FF7A00" />
+                        <Text style={styles.ratingText}>{chat.driverRating.toFixed(2)}</Text>
                       </View>
-                      <Text style={[styles.chatTime, { color: theme.textMuted }]}>
-                        {chat.time}
-                      </Text>
-                    </View>
-
-                    <Text numberOfLines={1} style={[styles.routeText, { color: theme.primary }]}>
-                      {chat.route}
-                    </Text>
-
-                    <View style={styles.vehicleRow}>
-                      <Car size={11} color={theme.textMuted} style={{ marginRight: 4 }} />
-                      <Text numberOfLines={1} style={[styles.vehicleText, { color: theme.textMuted }]}>
-                        {chat.vehicleModel} • {chat.vehiclePlate}
-                      </Text>
                     </View>
 
                     <Text
@@ -164,13 +148,18 @@ export default function ChatListScreen() {
                     </Text>
                   </View>
 
-                  {(chat.unreadCount || 0) > 0 ? (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadText}>{chat.unreadCount}</Text>
-                    </View>
-                  ) : (
-                    <ChevronRight size={16} color={theme.textMuted} />
-                  )}
+                  <View style={styles.chatRightCol}>
+                    <Text style={[styles.chatTime, { color: theme.textMuted }]}>
+                      {chat.time}
+                    </Text>
+                    {(chat.unreadCount || 0) > 0 ? (
+                      <View style={styles.unreadBadge}>
+                        <Text style={styles.unreadText}>{chat.unreadCount}</Text>
+                      </View>
+                    ) : (
+                      <ChevronRight size={16} color={theme.textMuted} />
+                    )}
+                  </View>
                 </View>
               </Card>
             </TouchableOpacity>
@@ -268,12 +257,13 @@ const styles = StyleSheet.create({
   },
   chatCol: {
     flex: 1,
+    marginRight: 8,
   },
-  chatTopLine: {
+  chatNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
+    gap: 6,
+    marginBottom: 4,
   },
   driverName: {
     fontSize: 15,
@@ -293,25 +283,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#FF7A00',
   },
-  chatTime: {
-    fontSize: 11,
-  },
-  routeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  vehicleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  vehicleText: {
-    fontSize: 11,
-  },
   lastMessageText: {
     fontSize: 13,
-    lineHeight: 17,
+    lineHeight: 18,
+  },
+  chatRightCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    paddingTop: 1,
+  },
+  chatTime: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginBottom: 6,
   },
   unreadBadge: {
     backgroundColor: '#FF7A00',

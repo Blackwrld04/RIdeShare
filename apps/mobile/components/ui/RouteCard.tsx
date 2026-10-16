@@ -17,6 +17,7 @@ import {
 } from 'lucide-react-native';
 import { useAppStore } from '../../store/useAppStore';
 import { searchNigerianLocations, type NigerianLandmark } from '../../constants/nigerianLocations';
+import { DatePickerModal } from './DatePickerModal';
 
 interface RouteCardProps {
   onSearchPress?: () => void;
@@ -160,7 +161,7 @@ export const RouteCard: React.FC<RouteCardProps> = ({ onSearchPress, compact = f
         {/* Date Selector */}
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => setShowDatePicker(!showDatePicker)}
+          onPress={() => setShowDatePicker(true)}
           style={styles.selectorItem}
         >
           <Calendar size={16} color="#6B7280" />
@@ -194,42 +195,13 @@ export const RouteCard: React.FC<RouteCardProps> = ({ onSearchPress, compact = f
         </TouchableOpacity>
       </View>
 
-      {/* Expandable Date Picker Chips */}
-      {showDatePicker && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.inlineChipsScroll}
-        >
-          {dates.map((d) => {
-            const isSelected = searchDate === d;
-            return (
-              <TouchableOpacity
-                key={d}
-                onPress={() => {
-                  setSearchDate(d);
-                  setShowDatePicker(false);
-                }}
-                style={[
-                  styles.inlineChip,
-                  {
-                    backgroundColor: isSelected ? theme.heroCardButton : '#F3F4F6',
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.inlineChipText,
-                    { color: isSelected ? '#FFFFFF' : '#374151' },
-                  ]}
-                >
-                  {d}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      )}
+      {/* Calendar Date Picker Modal */}
+      <DatePickerModal
+        visible={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        currentDateStr={searchDate}
+        onSelectDate={(formatted) => setSearchDate(formatted)}
+      />
 
       {/* Expandable Seat Options */}
       {showSeatPicker && (

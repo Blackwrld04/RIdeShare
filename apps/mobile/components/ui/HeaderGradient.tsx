@@ -40,26 +40,8 @@ export const HeaderGradient: React.FC<HeaderGradientProps> = ({
             <Logo size={32} showText={true} isDark={themeMode === 'dark'} />
           </View>
 
-          {/* Action Icons: Search, Theme Toggle & Notifications */}
+          {/* Action Icons: Theme Toggle & Notifications */}
           <View style={styles.actionButtons}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => router.push('/(tabs)/search')}
-              style={[
-                styles.iconCircle,
-                {
-                  backgroundColor:
-                    themeMode === 'light' ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.08)',
-                  borderColor: theme.surfaceBorder,
-                },
-              ]}
-            >
-              <Search
-                size={18}
-                color={themeMode === 'light' ? '#111827' : '#FFFFFF'}
-              />
-            </TouchableOpacity>
-
             <TouchableOpacity
               onPress={toggleTheme}
               activeOpacity={0.8}
