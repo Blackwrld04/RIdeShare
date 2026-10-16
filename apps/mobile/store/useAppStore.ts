@@ -185,7 +185,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   logout: async () => {
-    await api.auth.logout();
+    try {
+      await api.auth.logout();
+    } catch (e) {
+      console.warn('api.auth.logout error:', e);
+    }
     set({ user: null, isAuthenticated: false, bookings: [], activeTrip: null });
   },
 

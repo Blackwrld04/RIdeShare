@@ -270,15 +270,16 @@ export const api = {
       return res.data;
     },
     logout: async () => {
-      const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
       try {
+        const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
         if (refreshToken) {
-          await apiClient.post('/auth/logout', { refreshToken });
+          await apiClient.post('/auth/logout', { refreshToken }).catch(() => {});
         }
       } catch (err) {
         // Continue clearing local tokens
+      } finally {
+        await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
       }
-      await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
     },
     getToken: async () => {
       return AsyncStorage.getItem(ACCESS_TOKEN_KEY);

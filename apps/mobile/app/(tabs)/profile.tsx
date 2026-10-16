@@ -184,25 +184,19 @@ export default function ProfileScreen() {
     Alert.alert('Profile Saved', 'Your personal details have been successfully updated.');
   };
 
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const performLogout = async () => {
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } catch {}
+    setShowLogoutModal(false);
+    await logout();
+    router.replace('/welcome');
+  };
+
   const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out of your RideShare account?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Log Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            } catch {}
-            await logout();
-            router.replace('/welcome');
-          },
-        },
-      ]
-    );
+    setShowLogoutModal(true);
   };
 
   // Completeness score
@@ -232,9 +226,25 @@ export default function ProfileScreen() {
           },
         ]}
       >
-        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
-          Profile
-        </Text>
+        <View style={styles.headerTopRow}>
+          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
+            Profile
+          </Text>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleLogout}
+            style={[
+              styles.headerLogoutBtn,
+              {
+                backgroundColor: isLight ? '#FEF2F2' : 'rgba(239, 68, 68, 0.12)',
+                borderColor: isLight ? '#FECACA' : 'rgba(239, 68, 68, 0.25)',
+              },
+            ]}
+          >
+            <LogOut size={14} color="#EF4444" />
+            <Text style={styles.headerLogoutText}>Log out</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* 2-Tab Segmented Switch: About you | Account */}
         <View style={styles.topTabBar}>
@@ -955,11 +965,20 @@ export default function ProfileScreen() {
 
             {/* Log out link */}
             <TouchableOpacity
-              activeOpacity={0.7}
+              activeOpacity={0.8}
               onPress={handleLogout}
-              style={styles.logoutRow}
+              style={[
+                styles.logoutRow,
+                {
+                  backgroundColor: isLight ? '#FEF2F2' : 'rgba(239, 68, 68, 0.08)',
+                  borderColor: isLight ? '#FECACA' : 'rgba(239, 68, 68, 0.22)',
+                  borderWidth: 1,
+                  borderRadius: 16,
+                },
+              ]}
             >
-              <Text style={[styles.logoutText, { color: theme.primary }]}>
+              <LogOut size={18} color="#EF4444" style={{ marginRight: 8 }} />
+              <Text style={styles.logoutText}>
                 Log out
               </Text>
             </TouchableOpacity>
@@ -1948,6 +1967,81 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
+      {/* Logout Confirmation Modal (Fully functional on Web and Native) */}
+      <Modal
+        visible={showLogoutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLogoutModal(false)}
+      >
+        <View style={styles.logoutModalOverlay}>
+          <View
+            style={[
+              styles.logoutModalCard,
+              {
+                backgroundColor: isLight ? '#FFFFFF' : '#161922',
+                borderColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.1)',
+              },
+            ]}
+          >
+            <View style={styles.logoutIconCircle}>
+              <LogOut size={26} color="#EF4444" />
+            </View>
+
+            <Text
+              style={[
+                styles.logoutModalTitle,
+                { color: isLight ? '#0F172A' : '#FFFFFF' },
+              ]}
+            >
+              Log out of RideShare?
+            </Text>
+
+            <Text
+              style={[
+                styles.logoutModalSub,
+                { color: isLight ? '#64748B' : '#94A3B8' },
+              ]}
+            >
+              Are you sure you want to log out? You can sign back in anytime using your phone or email.
+            </Text>
+
+            <View style={styles.logoutModalBtnRow}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowLogoutModal(false)}
+                style={[
+                  styles.logoutModalCancelBtn,
+                  {
+                    backgroundColor: isLight ? '#F1F5F9' : '#1E222D',
+                    borderColor: isLight
+                      ? '#CBD5E1'
+                      : 'rgba(255, 255, 255, 0.08)',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.logoutModalCancelText,
+                    { color: isLight ? '#0F172A' : '#FFFFFF' },
+                  ]}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={performLogout}
+                style={styles.logoutModalConfirmBtn}
+              >
+                <Text style={styles.logoutModalConfirmText}>Yes, Log Out</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Help & Support Modal */}
       <HelpSupportModal
         visible={isHelpOpen}
@@ -1965,11 +2059,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderBottomWidth: 1,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  headerLogoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+  },
+  headerLogoutText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.4,
-    marginBottom: 8,
   },
   topTabBar: {
     flexDirection: 'row',
@@ -2443,5 +2556,83 @@ const styles = StyleSheet.create({
   stateOptionSub: {
     fontSize: 12,
     marginTop: 2,
+  },
+
+  // Logout Confirmation Modal
+  logoutModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  logoutModalCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  logoutIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  logoutModalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  logoutModalSub: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  logoutModalBtnRow: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  logoutModalCancelBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoutModalCancelText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  logoutModalConfirmBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  logoutModalConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
   },
 });
