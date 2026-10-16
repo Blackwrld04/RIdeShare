@@ -136,7 +136,7 @@ export class GmailSmtpOtpDelivery extends OtpDelivery {
 
   async send(message: OtpMessage): Promise<string> {
     const minutes = Math.ceil(message.expiresInSeconds / 60);
-    const recipient = message.email || this.config.SMTP_USER;
+    const recipient = message.email?.trim().toLowerCase();
     if (!recipient) {
       throw new Error("No recipient email specified for Gmail SMTP OTP delivery");
     }
@@ -250,29 +250,13 @@ export class HybridOtpDelivery extends OtpDelivery {
   }
 
   async send(message: OtpMessage): Promise<string> {
-    // If an email address is provided and SMTP is configured, send via Gmail SMTP
+    // If an email address is provided and SMTP is configured, send directly to the user's email
     if (message.email && this.emailDelivery) {
-      try {
-        const result = await this.emailDelivery.send(message);
-        return result;
-      } catch (err) {
-        console.error("[GmailSmtpOtpDelivery] Failed to send email OTP:", err);
-      }
+      return await this.emailDelivery.send(message);
     }
 
-    // Otherwise, try SMS delivery
-    try {
-      return await this.primarySms.send(message);
-    } catch (smsError) {
-      // If SMS fails and we have email delivery with default SMTP user, send email copy
-      if (this.emailDelivery && this.config.SMTP_USER) {
-        return await this.emailDelivery.send({
-          ...message,
-          email: this.config.SMTP_USER,
-        });
-      }
-      throw smsError;
-    }
+    // Otherwise, send via SMS to user's phone number. Never fall back to sending user OTPs to SMTP_USER.
+    return await this.primarySms.send(message);
   }
 }
 

@@ -91,9 +91,6 @@ export default function AuthScreen() {
         const saved = await api.auth.getSavedEmail();
         if (saved) {
           setLoginEmail(saved);
-        } else {
-          // Default convenient suggestion if none saved yet
-          setLoginEmail('olajideabdulquadri22@gmail.com');
         }
       } catch {}
     })();

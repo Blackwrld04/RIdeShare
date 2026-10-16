@@ -196,8 +196,6 @@ export class AuthService {
       });
       if (existingUser?.profile?.billingEmail) {
         targetEmail = existingUser.profile.billingEmail;
-      } else if (phoneE164 === "+2348011112222" && this.config.SMTP_USER) {
-        targetEmail = this.config.SMTP_USER;
       }
     }
 
