@@ -74,29 +74,6 @@ export function TermsModal({ visible, onClose }: TermsModalProps) {
             { paddingBottom: Math.max(insets.bottom, 24) + 20 },
           ]}
         >
-          {/* Quick Notice Card */}
-          <View
-            style={[
-              styles.noticeCard,
-              {
-                backgroundColor: isLight ? '#EFF6FF' : 'rgba(37, 99, 235, 0.1)',
-                borderColor: isLight ? '#BFDBFE' : 'rgba(37, 99, 235, 0.25)',
-              },
-            ]}
-          >
-            <ShieldCheck size={20} color="#2563EB" />
-            <Text
-              style={[
-                styles.noticeText,
-                { color: isLight ? '#1E40AF' : '#93C5FD' },
-              ]}
-            >
-              RideShare connects car owners with empty seats to commuters heading along
-              the same corridor. Ride contributions are strictly for vehicle fuel and
-              operating cost-sharing without commercial passenger profit.
-            </Text>
-          </View>
-
           {/* Section 1 */}
           <View style={styles.sectionBlock}>
             <Text style={[styles.sectionHeading, { color: isLight ? '#0F172A' : '#FFFFFF' }]}>

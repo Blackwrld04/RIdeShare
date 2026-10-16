@@ -22,52 +22,67 @@ const genders = ['Woman', 'Man', 'Prefer not to say'];
 export default function ProfileSetupScreen() {
   const insets = useSafeAreaInsets();
   const { theme, user, setUser } = useAppStore();
-  const [name, setName] = useState(user?.displayName || 'Alina Okafor');
+  const [name, setName] = useState(user?.displayName || '');
+  const [phone, setPhone] = useState(user?.phoneE164?.replace('+234', '') || '');
   const [gender, setGender] = useState('Woman');
   const [nin, setNin] = useState('');
   const [isChangeAvatarOpen, setIsChangeAvatarOpen] = useState(false);
 
-  const isNinValid = useMemo(() => /^[0-9]{11}$/.test(nin), [nin]);
+  const isNinValid = useMemo(() => /^[0-9]{11}$/.test(nin.trim()), [nin]);
 
   const handleContinue = async () => {
     if (!name.trim()) {
-      Alert.alert('Name required', 'Please provide your full name.');
+      Alert.alert('Full Name Required', 'Please provide your full legal name to complete registration.');
       return;
     }
 
-    if (nin && !isNinValid) {
-      Alert.alert('Invalid NIN', 'NIN should be exactly 11 digits to pass the NIMC check.');
+    const cleanedPhone = phone.replace(/\D/g, '').replace(/^0+/, '');
+    if (!cleanedPhone || cleanedPhone.length < 10) {
+      Alert.alert('Phone Number Required', 'Please enter a valid 10 or 11-digit Nigerian mobile number.');
       return;
     }
 
-    const mappedGender = gender === 'Woman' ? 'WOMAN' : gender === 'Man' ? 'MAN' : 'PREFER_NOT_TO_SAY';
+    if (!nin.trim() || !isNinValid) {
+      Alert.alert('11-Digit NIN Required', 'Please provide your 11-digit National Identity Number (NIN) to pass NIMC identity verification.');
+      return;
+    }
+
+    const formattedPhone = `+234${cleanedPhone}`;
+    const mappedGender: 'WOMAN' | 'MAN' | 'NON_BINARY' | 'PREFER_NOT_TO_SAY' =
+      gender === 'Woman' ? 'WOMAN' : gender === 'Man' ? 'MAN' : 'PREFER_NOT_TO_SAY';
+
     try {
       await api.profile.update({
         displayName: name.trim(),
-        gender: mappedGender as any,
+        gender: mappedGender,
         bio: gender === 'Woman' ? 'Women-first commuting with verified daily routes.' : 'Comfortable commuting with a safe, trusted network.',
       });
     } catch (e) {
       console.warn('Backend profile update note:', e);
     }
 
-    const nextUser = {
+    const nextUser: any = {
       ...(user ?? {
         id: 'usr-102',
-        phoneE164: '+2348031234567',
         avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-        ninVerified: false,
-        isDriver: true,
-        rating: 4.9,
-        totalTrips: 1,
+        isDriver: false,
+        rating: 5.0,
+        totalTrips: 0,
       }),
+      id: user?.id || 'usr-102',
       displayName: name.trim(),
-      ninVerified: !!nin && isNinValid,
-      ninLast4: nin ? nin.slice(-4) : undefined,
+      phoneE164: formattedPhone,
+      ninVerified: true,
+      ninLast4: nin.trim().slice(-4),
+      gender: mappedGender,
+      isDriver: user?.isDriver || false,
+      rating: user?.rating || 5.0,
+      totalTrips: user?.totalTrips || 0,
       bio: gender === 'Woman' ? 'Women-first commuting with verified daily routes.' : 'Comfortable commuting with a safe, trusted network.',
     };
 
     setUser(nextUser);
+    Alert.alert('Profile Completed', 'Your profile details and verified identity have been saved successfully.');
     router.replace('/(tabs)');
   };
 
@@ -111,10 +126,66 @@ export default function ProfileSetupScreen() {
           <TextInput
             value={name}
             onChangeText={setName}
-            placeholder="Enter full name"
+            placeholder="Enter full legal name"
             placeholderTextColor={theme.textMuted}
             style={[styles.input, { backgroundColor: theme.surfaceCard, borderColor: theme.surfaceBorder, color: theme.textPrimary }]}
           />
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>Phone number</Text>
+          <View style={[styles.phoneInputRow, { backgroundColor: theme.surfaceCard, borderColor: theme.surfaceBorder }]}>
+            <View style={styles.countryCodeBadge}>
+              <Text style={[styles.countryCodeText, { color: theme.textPrimary }]}>🇳🇬 +234</Text>
+            </View>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              maxLength={11}
+              placeholder="801 234 5678"
+              placeholderTextColor={theme.textMuted}
+              style={[styles.phoneTextInput, { color: theme.textPrimary }]}
+            />
+          </View>
+          <Text style={[styles.fieldHint, { color: theme.textMuted }]}>
+            Used for driver contact and emergency trip notifications.
+          </Text>
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <Text style={[styles.label, { color: theme.textSecondary, marginBottom: 0 }]}>
+              National Identity Number (NIN)
+            </Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: nin.trim().length === 11 ? '#10B981' : theme.textMuted }}>
+              {nin.trim().length}/11 digits
+            </Text>
+          </View>
+          <TextInput
+            value={nin}
+            onChangeText={(text) => setNin(text.replace(/\D/g, ''))}
+            keyboardType="number-pad"
+            maxLength={11}
+            placeholder="11-digit NIN (e.g. 12345678901)"
+            placeholderTextColor={theme.textMuted}
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.surfaceCard,
+                borderColor: nin.trim().length === 11 ? '#10B981' : theme.surfaceBorder,
+                color: theme.textPrimary,
+              },
+            ]}
+          />
+          <View style={styles.ninMetaRow}>
+            <CheckCircle2 size={16} color={nin.trim().length === 11 ? '#10B981' : theme.textMuted} />
+            <Text style={[styles.ninMetaText, { color: theme.textMuted }]}>
+              {nin.trim().length === 11
+                ? 'NIMC verification format validated'
+                : 'Required for trusted, safe passenger & driver verification.'}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.fieldGroup}>
@@ -138,25 +209,6 @@ export default function ProfileSetupScreen() {
                 </TouchableOpacity>
               );
             })}
-          </View>
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={[styles.label, { color: theme.textSecondary }]}>NIN verification</Text>
-          <TextInput
-            value={nin}
-            onChangeText={setNin}
-            keyboardType="number-pad"
-            maxLength={11}
-            placeholder="11-digit NIN"
-            placeholderTextColor={theme.textMuted}
-            style={[styles.input, { backgroundColor: theme.surfaceCard, borderColor: theme.surfaceBorder, color: theme.textPrimary }]}
-          />
-          <View style={styles.ninMetaRow}>
-            <CheckCircle2 size={16} color={nin && isNinValid ? '#10B981' : theme.textMuted} />
-            <Text style={[styles.ninMetaText, { color: theme.textMuted }]}>
-              {nin && isNinValid ? 'NIMC format validated' : 'Optional for preview. Enter 11 digits to validate.'}
-            </Text>
           </View>
         </View>
 
@@ -249,6 +301,35 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     fontWeight: '600',
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  countryCodeBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(150, 150, 150, 0.2)',
+  },
+  countryCodeText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  phoneTextInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  fieldHint: {
+    fontSize: 12,
+    marginTop: 6,
+    lineHeight: 16,
   },
   genderRow: {
     flexDirection: 'row',

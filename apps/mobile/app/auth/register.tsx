@@ -144,7 +144,7 @@ export default function RegisterScreen() {
         isDriver: roleIntent === 'DRIVER',
       });
 
-      router.replace('/(tabs)');
+      router.replace('/auth/profile');
     } catch (err: any) {
       console.error('Registration finalize error:', err);
       // Fallback update store
@@ -160,7 +160,7 @@ export default function RegisterScreen() {
         rating: 5.0,
         totalTrips: 0,
       });
-      router.replace('/(tabs)');
+      router.replace('/auth/profile');
     } finally {
       setIsSubmitting(false);
     }

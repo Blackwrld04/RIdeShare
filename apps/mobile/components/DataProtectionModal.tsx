@@ -74,39 +74,6 @@ export function DataProtectionModal({ visible, onClose }: DataProtectionModalPro
             { paddingBottom: Math.max(insets.bottom, 24) + 20 },
           ]}
         >
-          {/* Statutory Certificate Box */}
-          <View
-            style={[
-              styles.certCard,
-              {
-                backgroundColor: isLight ? '#ECFDF5' : 'rgba(16, 185, 129, 0.1)',
-                borderColor: isLight ? '#A7F3D0' : 'rgba(16, 185, 129, 0.25)',
-              },
-            ]}
-          >
-            <ShieldCheck size={22} color="#10B981" />
-            <View style={{ flex: 1 }}>
-              <Text
-                style={[
-                  styles.certTitle,
-                  { color: isLight ? '#065F46' : '#6EE7B7' },
-                ]}
-              >
-                Certified NDPA 2023 Compliant
-              </Text>
-              <Text
-                style={[
-                  styles.certBody,
-                  { color: isLight ? '#047857' : '#A7F3D0' },
-                ]}
-              >
-                RideShare processes commuter data strictly in line with the Nigeria Data
-                Protection Act (NDPA) and NDPR regulations enforced by the Nigeria Data
-                Protection Commission (NDPC).
-              </Text>
-            </View>
-          </View>
-
           {/* Section 1 */}
           <View style={styles.sectionBlock}>
             <Text style={[styles.sectionHeading, { color: isLight ? '#0F172A' : '#FFFFFF' }]}>

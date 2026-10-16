@@ -94,29 +94,6 @@ export function CommunityGuideModal({ visible, onClose }: CommunityGuideModalPro
             { paddingBottom: Math.max(insets.bottom, 24) + 20 },
           ]}
         >
-          {/* Welcome Banner */}
-          <View
-            style={[
-              styles.welcomeCard,
-              {
-                backgroundColor: isLight ? '#F0FDF4' : 'rgba(16, 185, 129, 0.1)',
-                borderColor: isLight ? '#BBF7D0' : 'rgba(16, 185, 129, 0.25)',
-              },
-            ]}
-          >
-            <Heart size={22} color="#10B981" />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.welcomeTitle, { color: isLight ? '#166534' : '#6EE7B7' }]}>
-                Welcome to the RideShare Community
-              </Text>
-              <Text style={[styles.welcomeBody, { color: isLight ? '#15803D' : '#A7F3D0' }]}>
-                We are building Nigeria’s safest, most respectful carpooling network. Whether
-                you're a driver offering empty seats or a daily commuter, these standards keep
-                everyone safe and comfortable.
-              </Text>
-            </View>
-          </View>
-
           {/* Core Principle 1 */}
           <View style={styles.principleCard}>
             <View style={styles.principleHeader}>

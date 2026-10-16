@@ -293,7 +293,7 @@ export default function AuthScreen() {
             totalTrips: 0,
           });
         }
-        router.replace('/(tabs)');
+        router.replace('/auth/profile');
       }
     } catch (err: any) {
       const msg =
@@ -394,7 +394,11 @@ export default function AuthScreen() {
             totalTrips: 0,
           });
         }
-        router.replace('/(tabs)');
+        if (mode === 'signup') {
+          router.replace('/auth/profile');
+        } else {
+          router.replace('/(tabs)');
+        }
       }
     } catch (err: any) {
       const msg =
