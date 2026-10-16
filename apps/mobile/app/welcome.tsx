@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -31,6 +31,16 @@ export default function WelcomeScreen() {
   const [showSheet, setShowSheet] = useState(false);
 
   const isLight = themeMode === 'light';
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const origOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = origOverflow;
+      };
+    }
+  }, []);
 
   const handleOpenSheet = () => {
     try {
@@ -88,6 +98,24 @@ export default function WelcomeScreen() {
         },
       ]}
     >
+      {/* Full-Page Background Image covering the entire screen */}
+      <Image
+        source={require('../assets/welcome_full_bg.jpg')}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+      />
+
+      {/* Subtle overlay to ensure maximum contrast and readability */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: isLight
+              ? 'rgba(255, 255, 255, 0.04)'
+              : 'rgba(11, 13, 17, 0.45)',
+          },
+        ]}
+      />
 
       <View
         style={[
@@ -158,14 +186,8 @@ export default function WelcomeScreen() {
           </Text>
         </View>
 
-        {/* Center Graphic: The White Luxury Car on City Route Map centered */}
-        <View style={styles.centerGraphicContainer}>
-          <Image
-            source={require('../assets/welcome_car_centered.jpg')}
-            style={styles.centerCarImage}
-            resizeMode="contain"
-          />
-        </View>
+        {/* Center Graphic Spacer: allows the luxury car and navigation route map in welcome_full_bg to be centered and clearly visible */}
+        <View style={styles.centerSpacer} />
 
         {/* Bottom Action Area */}
         <View style={styles.bottomSection}>
@@ -493,19 +515,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontWeight: '500',
   },
-  centerGraphicContainer: {
+  centerSpacer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    overflow: 'hidden',
-    paddingVertical: 2,
-  },
-  centerCarImage: {
-    width: '100%',
-    height: '100%',
-    maxWidth: 420,
-    maxHeight: Math.min(height * 0.44, 340),
   },
   bottomSection: {
     paddingTop: 6,
