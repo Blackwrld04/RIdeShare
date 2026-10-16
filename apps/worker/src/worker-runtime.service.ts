@@ -199,7 +199,7 @@ export class WorkerRuntimeService
         currency: payout.currency,
         recipientCode: payout.bankAccount.providerRecipientCode,
         reference: payout.reference,
-        reason: "CommuteShare ride payout",
+        reason: "RideShare ride payout",
       });
       await this.recordTransferResult(payout.id, payout, result);
     } catch (initiationError) {

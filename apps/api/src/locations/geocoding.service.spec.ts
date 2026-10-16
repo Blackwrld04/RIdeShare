@@ -67,7 +67,7 @@ describe("GeocodingService", () => {
     const [url, request] = fetchImplementation.mock.calls[0] ?? [];
     expect(String(url)).toContain("countrycodes=ng");
     expect(request?.headers).toMatchObject({
-      "User-Agent": "CommuteShare/1.0",
+      "User-Agent": "RideShare/1.0",
     });
     expect(connection.set).toHaveBeenCalledTimes(2);
   });

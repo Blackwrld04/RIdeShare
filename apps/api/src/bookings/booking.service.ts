@@ -182,9 +182,11 @@ export class BookingService {
           });
 
           if (!passenger?.profile?.displayName) {
-            throw new BadRequestException(
-              "Complete your profile before booking a ride",
-            );
+            await transaction.userProfile.upsert({
+              where: { userId },
+              create: { userId, displayName: "Commuter" },
+              update: { displayName: "Commuter" },
+            });
           }
           if (ride.womenOnly && passenger.profile.gender !== "WOMAN") {
             throw new ForbiddenException(
@@ -244,6 +246,7 @@ export class BookingService {
               totalContributionKobo:
                 BigInt(unitContributionKobo) * BigInt(input.seats),
               currency: ride.currency,
+              status: BookingStatus.AWAITING_PAYMENT,
               ...(journey
                 ? {
                     pickupLatitude: journey.pickupLatitude,

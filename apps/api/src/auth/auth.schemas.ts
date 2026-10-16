@@ -2,9 +2,13 @@ import { z } from "zod";
 
 export const requestOtpSchema = z
   .object({
-    phone: z.string().trim().min(10).max(20),
+    phone: z.string().trim().min(3).max(255).optional(),
+    email: z.string().trim().email().optional(),
+    identifier: z.string().trim().min(3).max(255).optional(),
   })
-  .strict();
+  .refine((data) => Boolean(data.phone || data.email || data.identifier), {
+    message: "Either phone, email, or identifier must be provided",
+  });
 
 export const verifyOtpSchema = z
   .object({

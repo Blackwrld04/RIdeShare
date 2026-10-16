@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -22,12 +22,13 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../store/useAppStore';
+import { api } from '../../services/api';
 import type { ChatMessage } from '../../types';
 
 export default function ChatScreen() {
   const { bookingId } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  const { theme, themeMode, activeTrip } = useAppStore();
+  const { theme, themeMode, activeTrip, user } = useAppStore();
 
   const driver = activeTrip?.ride || {
     driverName: 'Olajide Abdulquadri',
@@ -69,6 +70,36 @@ export default function ChatScreen() {
     },
   ]);
 
+  useEffect(() => {
+    let isMounted = true;
+    const fetchChat = async () => {
+      if (!bookingId) return;
+      try {
+        const remoteMsgs = await api.chat.getMessages(String(bookingId));
+        if (isMounted && remoteMsgs && remoteMsgs.length > 0) {
+          setMessages(
+            remoteMsgs.map((m: any) => ({
+              id: m.id,
+              bookingId: String(bookingId),
+              senderId: m.senderId || m.sender?.id || '',
+              senderName: m.sender?.displayName || (m.sender?.id === user?.id ? 'You' : driver.driverName),
+              body: m.body,
+              isSelf: m.sender?.id === user?.id,
+              createdAt: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              read: Boolean(m.readAt),
+            }))
+          );
+        }
+      } catch {
+        // Fallback to local default conversation
+      }
+    };
+    fetchChat();
+    return () => {
+      isMounted = false;
+    };
+  }, [bookingId, user?.id, driver.driverName]);
+
   const quickChips = [
     'At the meeting spot',
     'Arriving in 2 mins',
@@ -96,7 +127,7 @@ export default function ChatScreen() {
     if (hasViolation) {
       Alert.alert(
         '⚠️ Anti-Scam Policy Notice',
-        'CommuteShare strictly requires 100% cashless Paystack escrow. Paying cash or transferring outside the app voids passenger safety insurance and is prohibited.',
+        'RideShare strictly requires 100% cashless Paystack escrow. Paying cash or transferring outside the app voids passenger safety insurance and is prohibited.',
       );
       return;
     }
@@ -108,7 +139,7 @@ export default function ChatScreen() {
     const newMsg: ChatMessage = {
       id: `m-${Date.now()}`,
       bookingId: String(bookingId),
-      senderId: 'usr-101',
+      senderId: user?.id || 'usr-101',
       senderName: 'You',
       body: content,
       isSelf: true,
@@ -118,6 +149,12 @@ export default function ChatScreen() {
 
     setMessages((prev) => [...prev, newMsg]);
     setInputText('');
+
+    if (bookingId) {
+      api.chat.sendMessage(String(bookingId), content).catch((err) => {
+        console.warn('Chat send note:', err?.message);
+      });
+    }
   };
 
   return (

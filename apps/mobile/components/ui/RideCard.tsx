@@ -16,7 +16,7 @@ interface RideCardProps {
   tag?: string;
 }
 
-export const RideCard: React.FC<RideCardProps> = ({ ride, onPress, tag }) => {
+export const RideCard: React.FC<RideCardProps> = ({ ride, onPress }) => {
   const { theme, themeMode } = useAppStore();
 
   const formatTime = (isoString: string) => {
@@ -29,7 +29,7 @@ export const RideCard: React.FC<RideCardProps> = ({ ride, onPress, tag }) => {
   };
 
   const formattedPrice = `₦${(ride.contributionKobo / 100).toLocaleString()}`;
-  const pillLabel = tag || (ride.availableSeats <= 1 ? '1 seat left' : 'Seat available');
+  const seatsLabel = ride.availableSeats <= 1 ? '1 seat left' : `${ride.availableSeats} seats left`;
 
   return (
     <TouchableOpacity
@@ -68,13 +68,6 @@ export const RideCard: React.FC<RideCardProps> = ({ ride, onPress, tag }) => {
               </Text>
             </View>
           </View>
-        </View>
-
-        {/* Top Tag (e.g. Cheapest / Fastest) */}
-        <View style={[styles.tagPill, { backgroundColor: theme.pillTagBg }]}>
-          <Text style={[styles.tagText, { color: theme.pillTagText }]}>
-            {tag || (ride.contributionKobo < 200000 ? 'Cheapest' : 'Fastest')}
-          </Text>
         </View>
       </View>
 
@@ -123,7 +116,7 @@ export const RideCard: React.FC<RideCardProps> = ({ ride, onPress, tag }) => {
 
         <View style={[styles.seatPill, { backgroundColor: theme.pillTagBg }]}>
           <Text style={[styles.seatPillText, { color: theme.pillTagText }]}>
-            {pillLabel}
+            {seatsLabel}
           </Text>
         </View>
       </View>
@@ -175,15 +168,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '400',
     marginLeft: 4,
-  },
-  tagPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  tagText: {
-    fontSize: 11,
-    fontWeight: '600',
   },
   routeRow: {
     flexDirection: 'row',

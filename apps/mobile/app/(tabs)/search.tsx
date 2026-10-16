@@ -1,57 +1,114 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   ScrollView,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ChevronLeft,
   SlidersHorizontal,
+  TrendingDown,
+  Sparkles,
+  ShieldCheck,
+  CheckCircle2,
 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../store/useAppStore';
 import { RideCard } from '../../components/ui/RideCard';
+import { ALL_DEMO_RIDES, getRidesForState } from '../../constants/demoData';
+import type { RideOffer } from '../../types';
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, rides, searchOrigin, searchDest } = useAppStore();
+  const {
+    theme,
+    themeMode,
+    rides,
+    homeState,
+    searchOrigin,
+    searchDest,
+    setSearchOrigin,
+    setSearchDest,
+    fetchRides,
+  } = useAppStore();
 
-  const [selectedDateIndex, setSelectedDateIndex] = useState(0);
-  const [selectedFilter, setSelectedFilter] = useState<'Cheapest' | 'Fastest' | 'Women-only'>('Cheapest');
+  const [selectedFilter, setSelectedFilter] = useState<'All' | 'Cheapest' | 'Fastest' | 'Women-only' | 'Top Drivers'>('All');
 
-  const calendarDays = [
-    { day: 'TUE', date: '16' },
-    { day: 'WED', date: '17' },
-    { day: 'THU', date: '18' },
-    { day: 'FRI', date: '19' },
-    { day: 'SAT', date: '20' },
-    { day: 'SUN', date: '21' },
-  ];
+  // Ensure store has rides on mount
+  useEffect(() => {
+    fetchRides();
+  }, []);
 
-  const filteredRides = useMemo(() => {
-    const sorted = [...rides];
+  // Filtered & sorted rides combining backend database rides and all corridor rides
+  const displayRides = useMemo(() => {
+    const map = new Map<string, RideOffer>();
+    // 1. Add all Nigerian corridor demo rides
+    ALL_DEMO_RIDES.forEach((r) => map.set(r.id, r));
+    // 2. Add region-specific rides
+    const regional = getRidesForState(homeState);
+    regional.forEach((r) => map.set(r.id, r));
+    // 3. Add database / store rides
+    (rides || []).forEach((r) => map.set(r.id, r));
 
-    if (selectedFilter === 'Cheapest') {
-      sorted.sort((a, b) => a.contributionKobo - b.contributionKobo);
-    }
+    const allRides = Array.from(map.values());
+    let list = [...allRides];
 
-    if (selectedFilter === 'Fastest') {
-      sorted.sort((a, b) => {
-        const aMinutes = new Date(a.estimatedArrival).getTime() - new Date(a.departureTime).getTime();
-        const bMinutes = new Date(b.estimatedArrival).getTime() - new Date(b.departureTime).getTime();
-        return aMinutes - bMinutes;
+    // Route search prioritization
+    const fromKey = searchOrigin ? searchOrigin.split(',')[0].trim().toLowerCase() : '';
+    const toKey = searchDest ? searchDest.split(',')[0].trim().toLowerCase() : '';
+
+    if (fromKey || toKey) {
+      const matched = list.filter((r) => {
+        const matchOrigin = !fromKey || r.originTitle.toLowerCase().includes(fromKey) || r.originLandmark.toLowerCase().includes(fromKey);
+        const matchDest = !toKey || r.destTitle.toLowerCase().includes(toKey) || r.destLandmark.toLowerCase().includes(toKey);
+        return matchOrigin || matchDest;
       });
+
+      const unmatched = list.filter((r) => !matched.some((m) => m.id === r.id));
+      list = [...matched, ...unmatched];
     }
 
-    if (selectedFilter === 'Women-only') {
-      return sorted.filter((ride) => ride.isFemaleOnly);
+    // Apply sort / filter
+    if (selectedFilter === 'Cheapest') {
+      list.sort((a, b) => a.contributionKobo - b.contributionKobo);
+    } else if (selectedFilter === 'Fastest') {
+      list.sort((a, b) => {
+        const aMin = new Date(a.estimatedArrival).getTime() - new Date(a.departureTime).getTime();
+        const bMin = new Date(b.estimatedArrival).getTime() - new Date(b.departureTime).getTime();
+        return aMin - bMin;
+      });
+    } else if (selectedFilter === 'Women-only') {
+      const womenOnly = list.filter((r) => r.isFemaleOnly);
+      list = womenOnly.length > 0 ? womenOnly : list;
+    } else if (selectedFilter === 'Top Drivers') {
+      const top = list.filter((r) => r.driverRating >= 4.90);
+      list = top.length > 0 ? top : list;
     }
 
-    return sorted;
-  }, [rides, selectedFilter]);
+    return list;
+  }, [rides, selectedFilter, searchOrigin, searchDest, homeState]);
+
+  const isLight = themeMode === 'light';
+
+  // Extract clean short route summary
+  const routeSummary = useMemo(() => {
+    if (searchOrigin && searchDest) {
+      const from = searchOrigin.split(',')[0].trim();
+      const to = searchDest.split(',')[0].trim();
+      return `${from} → ${to}`;
+    }
+    return 'All Highway Corridors';
+  }, [searchOrigin, searchDest]);
+
+  const handleClearRouteFilter = () => {
+    setSearchOrigin('');
+    setSearchDest('');
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -60,12 +117,12 @@ export default function SearchScreen() {
         style={[
           styles.header,
           {
-            paddingTop: Math.max(insets.top, 16) + 6,
+            paddingTop: Math.max(insets.top, 16) + 4,
             backgroundColor: theme.background,
+            borderBottomColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.08)',
           },
         ]}
       >
-        {/* Navigation Bar */}
         <View style={styles.navRow}>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -78,99 +135,65 @@ export default function SearchScreen() {
               },
             ]}
           >
-            <ChevronLeft size={20} color={theme.textPrimary} />
+            <ChevronLeft size={22} color={theme.textPrimary} />
           </TouchableOpacity>
 
-          <Text style={[styles.navTitle, { color: theme.textPrimary }]}>
-            Ride Overview
-          </Text>
+          <View style={styles.navTitleBox}>
+            <Text style={[styles.navTitle, { color: theme.textPrimary }]}>
+              Available Rides
+            </Text>
+            <Text numberOfLines={1} style={[styles.navSubtitle, { color: theme.textMuted }]}>
+              {routeSummary}
+            </Text>
+          </View>
 
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={[
-              styles.navButton,
-              {
-                backgroundColor: theme.surfaceCard,
-                borderColor: theme.surfaceBorder,
-              },
-            ]}
-          >
-            <SlidersHorizontal size={18} color={theme.textPrimary} />
-          </TouchableOpacity>
+          {Boolean(searchOrigin || searchDest) ? (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                try {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                } catch {}
+                handleClearRouteFilter();
+              }}
+              style={[
+                styles.navButton,
+                {
+                  backgroundColor: theme.surfaceCard,
+                  borderColor: theme.surfaceBorder,
+                },
+              ]}
+            >
+              <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>All</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 40 }} />
+          )}
         </View>
 
-        {/* Date Subtitle */}
-        <Text style={[styles.dateSubtitle, { color: theme.textSecondary }]}>
-          Tue, 16 June 2026
-        </Text>
-
-        {/* Horizontal Calendar Date Strip (Screen 3 Reference) */}
+        {/* Filter Chips Strip */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.calendarScroll}
+          contentContainerStyle={styles.filterScroll}
         >
-          {calendarDays.map((item, index) => {
-            const isSelected = selectedDateIndex === index;
-            return (
-              <TouchableOpacity
-                key={index}
-                activeOpacity={0.75}
-                onPress={() => setSelectedDateIndex(index)}
-                style={[
-                  styles.calendarPill,
-                  {
-                    backgroundColor: isSelected ? theme.chipActiveBg : theme.surfaceCard,
-                    borderColor: theme.surfaceBorder,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.dayText,
-                    {
-                      color: isSelected ? theme.chipActiveText : theme.textMuted,
-                      fontWeight: isSelected ? '800' : '600',
-                    },
-                  ]}
-                >
-                  {item.day}
-                </Text>
-                <Text
-                  style={[
-                    styles.dateNumberText,
-                    {
-                      color: isSelected ? theme.chipActiveText : theme.textPrimary,
-                      fontWeight: '800',
-                    },
-                  ]}
-                >
-                  {item.date}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* Ride Results Feed */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <View style={styles.filterRow}>
-          {(['Cheapest', 'Fastest', 'Women-only'] as const).map((option) => {
+          {(['All', 'Cheapest', 'Fastest', 'Women-only', 'Top Drivers'] as const).map((option) => {
             const selected = selectedFilter === option;
             return (
               <TouchableOpacity
                 key={option}
                 activeOpacity={0.8}
-                onPress={() => setSelectedFilter(option)}
+                onPress={() => {
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  } catch {}
+                  setSelectedFilter(option);
+                }}
                 style={[
                   styles.filterChip,
                   {
                     backgroundColor: selected ? theme.chipActiveBg : theme.surfaceCard,
-                    borderColor: theme.surfaceBorder,
+                    borderColor: selected ? theme.chipActiveBg : theme.surfaceBorder,
                   },
                 ]}
               >
@@ -185,27 +208,59 @@ export default function SearchScreen() {
               </TouchableOpacity>
             );
           })}
+        </ScrollView>
+      </View>
+
+      {/* Main Content: List of Available Drives & Corridor Rides */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 20) + 90 },
+        ]}
+      >
+        {/* Cost Protection Banner */}
+        <View
+          style={[
+            styles.costCapBanner,
+            {
+              backgroundColor: theme.surfaceCard,
+              borderColor: theme.surfaceBorder,
+            },
+          ]}
+        >
+          <TrendingDown size={18} color="#10B981" style={{ marginRight: 10 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.costCapTitle, { color: theme.textPrimary }]}>
+              RideShare Cost-Protection Active
+            </Text>
+            <Text style={[styles.costCapSub, { color: theme.textMuted }]}>
+              Fares are capped to prevent surge pricing. Tap any ride to view seats and route details.
+            </Text>
+          </View>
         </View>
 
+        {/* Results Counter */}
         <View style={styles.resultsHeaderRow}>
           <Text style={[styles.resultsCount, { color: theme.textPrimary }]}>
-            {filteredRides.length} rides available
+            {displayRides.length} {displayRides.length === 1 ? 'ride' : 'rides'} available
           </Text>
-          <TouchableOpacity>
-            <Text style={[styles.seeAllText, { color: theme.textSecondary }]}>
-              See all
-            </Text>
-          </TouchableOpacity>
         </View>
 
+        {/* Rides Feed */}
         <View style={styles.ridesList}>
-          {filteredRides.map((ride, index) => (
-            <RideCard
-              key={ride.id}
-              ride={ride}
-              onPress={() => router.push(`/rides/${ride.id}`)}
-              tag={index === 0 ? selectedFilter : undefined}
-            />
+          {displayRides.map((ride) => (
+            <View key={ride.id} style={styles.rideCardOuterWrap}>
+              <RideCard
+                ride={ride}
+                onPress={() => {
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  } catch {}
+                  router.push(`/rides/${ride.id}`);
+                }}
+              />
+            </View>
           ))}
         </View>
       </ScrollView>
@@ -219,87 +274,91 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
   },
   navRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   navButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  navTitleBox: {
+    alignItems: 'center',
+    flex: 1,
+    paddingHorizontal: 8,
   },
   navTitle: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
-  dateSubtitle: {
-    fontSize: 16,
+  navSubtitle: {
+    fontSize: 12,
     fontWeight: '600',
-    marginBottom: 14,
+    marginTop: 2,
   },
-  calendarScroll: {
-    gap: 10,
-    paddingRight: 20,
+  filterScroll: {
+    gap: 8,
+    paddingVertical: 2,
   },
-  calendarPill: {
-    width: 56,
-    height: 78,
-    borderRadius: 28,
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
   },
-  dayText: {
-    fontSize: 11,
-    letterSpacing: 0.5,
-  },
-  dateNumberText: {
-    fontSize: 17,
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 110,
+    paddingTop: 16,
   },
-  filterRow: {
+  costCapBanner: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 18,
-  },
-  filterChip: {
-    borderRadius: 999,
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    marginBottom: 16,
   },
-  filterChipText: {
+  costCapTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  costCapSub: {
     fontSize: 12,
-    fontWeight: '700',
+    lineHeight: 16,
   },
   resultsHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
   resultsCount: {
     fontSize: 16,
     fontWeight: '800',
   },
-  seeAllText: {
-    fontSize: 14,
+  resultsMeta: {
+    fontSize: 12,
     fontWeight: '600',
   },
   ridesList: {
-    gap: 4,
+    gap: 12,
+  },
+  rideCardOuterWrap: {
+    marginBottom: 4,
   },
 });

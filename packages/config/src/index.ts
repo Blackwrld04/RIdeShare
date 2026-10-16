@@ -205,6 +205,13 @@ const environmentSchema = z
     AFRICASTALKING_USERNAME: optionalString(z.string().trim().min(1).max(64)),
     AFRICASTALKING_API_KEY: optionalString(z.string().trim().min(1)),
     AFRICASTALKING_SENDER_ID: optionalString(z.string().trim().min(3).max(11)),
+    SMTP_HOST: optionalString(z.string().trim()),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(465),
+    SMTP_USER: optionalString(z.string().trim()),
+    SMTP_PASS: optionalString(z.string().trim()),
+    SMTP_SECURE: z.coerce.boolean().default(true),
+    EMAIL_FROM: optionalString(z.string().trim()),
+    COOKIE_SECRET: optionalString(z.string().trim()),
     WEB_PUSH_PROVIDER: z.enum(["console", "vapid"]).default("console"),
     WEB_PUSH_VAPID_SUBJECT: optionalString(vapidSubjectSchema),
     WEB_PUSH_VAPID_PUBLIC_KEY: optionalString(vapidKeySchema.min(80).max(100)),
@@ -295,7 +302,7 @@ const environmentSchema = z
       .trim()
       .min(8)
       .max(200)
-      .default("CommuteShare/1.0"),
+      .default("RideShare/1.0"),
     GEOCODING_CACHE_SECONDS: z.coerce
       .number()
       .int()

@@ -13,8 +13,10 @@ import {
   Users,
   Search,
   ChevronDown,
+  MapPin,
 } from 'lucide-react-native';
 import { useAppStore } from '../../store/useAppStore';
+import { searchNigerianLocations, type NigerianLandmark } from '../../constants/nigerianLocations';
 
 interface RouteCardProps {
   onSearchPress?: () => void;
@@ -25,6 +27,7 @@ export const RouteCard: React.FC<RouteCardProps> = ({ onSearchPress, compact = f
   const {
     theme,
     themeMode,
+    homeState,
     searchOrigin,
     searchDest,
     searchDate,
@@ -44,24 +47,9 @@ export const RouteCard: React.FC<RouteCardProps> = ({ onSearchPress, compact = f
   const seatOptions = [1, 2, 3, 4];
 
   const suggestions = useMemo(() => {
-    const hubs = [
-      'Berger Bus Stop, Lagos',
-      'Lekki Toll Gate, Lagos',
-      'CMS Marina, Lagos Island',
-      'Ikeja GRA, Lagos',
-      'Gwarinpa, Abuja',
-      'Wuse Zone 4, Abuja',
-      'Ikorodu BRT Terminal, Lagos',
-      'Victoria Island, Lagos',
-    ];
-
-    const filter = (value: string) => {
-      if (!value.trim()) return hubs.slice(0, 4);
-      return hubs.filter((entry) => entry.toLowerCase().includes(value.toLowerCase())).slice(0, 4);
-    };
-
-    return focusedField === 'from' ? filter(searchOrigin) : focusedField === 'to' ? filter(searchDest) : [];
-  }, [focusedField, searchOrigin, searchDest]);
+    const q = focusedField === 'from' ? searchOrigin : focusedField === 'to' ? searchDest : '';
+    return searchNigerianLocations(q, homeState).slice(0, 5);
+  }, [focusedField, searchOrigin, searchDest, homeState]);
 
   return (
     <View
@@ -91,7 +79,7 @@ export const RouteCard: React.FC<RouteCardProps> = ({ onSearchPress, compact = f
               value={searchOrigin}
               onChangeText={setSearchOrigin}
               onFocus={() => setFocusedField('from')}
-              placeholder="e.g. Berger Bus Stop, Lagos"
+              placeholder={homeState === 'Osun' ? 'e.g. Olaiya Flyover, Osogbo' : `e.g. Central Terminal, ${homeState}`}
               placeholderTextColor="#9CA3AF"
               style={[styles.textInput, { color: theme.heroCardText }]}
             />
@@ -99,17 +87,21 @@ export const RouteCard: React.FC<RouteCardProps> = ({ onSearchPress, compact = f
 
           {focusedField === 'from' && suggestions.length > 0 && (
             <View style={[styles.suggestionBox, { backgroundColor: theme.surfaceCard, borderColor: theme.surfaceBorder }]}>
-              {suggestions.map((suggestion) => (
+              {suggestions.map((lm) => (
                 <TouchableOpacity
-                  key={suggestion}
+                  key={lm.id}
                   activeOpacity={0.8}
                   onPress={() => {
-                    setSearchOrigin(suggestion);
+                    setSearchOrigin(`${lm.name}, ${lm.city}`, { latitude: lm.latitude, longitude: lm.longitude });
                     setFocusedField(null);
                   }}
                   style={styles.suggestionRow}
                 >
-                  <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>{suggestion}</Text>
+                  <MapPin size={14} color="#FF6B00" style={{ marginRight: 8 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>{lm.name}</Text>
+                    <Text style={{ fontSize: 11, color: theme.textMuted }}>{lm.city} • {lm.state}</Text>
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -124,7 +116,7 @@ export const RouteCard: React.FC<RouteCardProps> = ({ onSearchPress, compact = f
               value={searchDest}
               onChangeText={setSearchDest}
               onFocus={() => setFocusedField('to')}
-              placeholder="e.g. Victoria Island, Lagos"
+              placeholder={homeState === 'Osun' ? 'e.g. Mayfair Roundabout, Ile-Ife' : `e.g. Major Hub, ${homeState}`}
               placeholderTextColor="#9CA3AF"
               style={[styles.textInput, { color: theme.heroCardText }]}
             />
@@ -132,17 +124,21 @@ export const RouteCard: React.FC<RouteCardProps> = ({ onSearchPress, compact = f
 
           {focusedField === 'to' && suggestions.length > 0 && (
             <View style={[styles.suggestionBox, { backgroundColor: theme.surfaceCard, borderColor: theme.surfaceBorder }]}>
-              {suggestions.map((suggestion) => (
+              {suggestions.map((lm) => (
                 <TouchableOpacity
-                  key={suggestion}
+                  key={lm.id}
                   activeOpacity={0.8}
                   onPress={() => {
-                    setSearchDest(suggestion);
+                    setSearchDest(`${lm.name}, ${lm.city}`, { latitude: lm.latitude, longitude: lm.longitude });
                     setFocusedField(null);
                   }}
                   style={styles.suggestionRow}
                 >
-                  <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>{suggestion}</Text>
+                  <MapPin size={14} color="#38BDF8" style={{ marginRight: 8 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>{lm.name}</Text>
+                    <Text style={{ fontSize: 11, color: theme.textMuted }}>{lm.city} • {lm.state}</Text>
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>

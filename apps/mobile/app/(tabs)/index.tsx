@@ -19,7 +19,7 @@ import { HeaderGradient } from '../../components/ui/HeaderGradient';
 import { RouteCard } from '../../components/ui/RouteCard';
 import { RideCard } from '../../components/ui/RideCard';
 import { HeroCarousel } from '../../components/ui/HeroCarousel';
-import { NigerianCorridors } from '../../constants/theme';
+import { getCorridorsForState, type NigerianCorridor } from '../../constants/theme';
 
 export default function HomeScreen() {
   const {
@@ -27,12 +27,15 @@ export default function HomeScreen() {
     themeMode,
     user,
     rides,
+    homeState,
     activeTrip,
     setSearchOrigin,
     setSearchDest,
   } = useAppStore();
 
-  const handleCorridorSelect = (corridor: (typeof NigerianCorridors)[0]) => {
+  const corridors = React.useMemo(() => getCorridorsForState(homeState), [homeState]);
+
+  const handleCorridorSelect = (corridor: NigerianCorridor) => {
     setSearchOrigin(corridor.from);
     setSearchDest(corridor.to);
     router.push('/(tabs)/search');
@@ -59,32 +62,11 @@ export default function HomeScreen() {
 
         <HeroCarousel />
 
-        {activeTrip && (
-          <View style={styles.sectionContainer}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => router.push(`/tracking/${activeTrip.id}`)}
-              style={[styles.activeTripCard, { backgroundColor: theme.surfaceCard, borderColor: theme.surfaceBorder }]}
-            >
-              <View style={styles.activeTripHeaderRow}>
-                <Text style={[styles.activeTripLabel, { color: theme.textSecondary }]}>Active trip</Text>
-                <Text style={[styles.activeTripMeta, { color: theme.textMuted }]}>Live</Text>
-              </View>
-              <Text style={[styles.activeTripRoute, { color: theme.textPrimary }]}>
-                {activeTrip.pickupLandmark} → {activeTrip.dropoffLandmark}
-              </Text>
-              <Text style={[styles.activeTripDriver, { color: theme.textSecondary }]}>
-                Driver: {activeTrip.ride.driverName}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* Best Rides Section (Screen 1 Inspiration) */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-              Best Rides
+              Best Rides in {homeState}
             </Text>
             <TouchableOpacity onPress={() => router.push('/(tabs)/search')}>
               <Text style={[styles.seeAllText, { color: theme.textSecondary }]}>
@@ -99,12 +81,11 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.ridesHorizontalScroll}
           >
-            {rides.map((ride, index) => (
+            {rides.map((ride) => (
               <View key={ride.id} style={styles.horizontalCardWrapper}>
                 <RideCard
                   ride={ride}
                   onPress={() => router.push(`/rides/${ride.id}`)}
-                  tag={index === 0 ? 'Cheapest' : 'Fastest'}
                 />
               </View>
             ))}
@@ -116,7 +97,7 @@ export default function HomeScreen() {
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionTitleWithBadge}>
               <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                Popular Corridors
+                {homeState} Popular Corridors
               </Text>
               <View style={[styles.costCapBadge, { backgroundColor: theme.pillTagBg }]}>
                 <Text style={[styles.costCapText, { color: theme.pillTagText }]}>
@@ -132,7 +113,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.corridorsList}>
-            {NigerianCorridors.map((c) => (
+            {corridors.map((c) => (
               <TouchableOpacity
                 key={c.id}
                 activeOpacity={0.8}

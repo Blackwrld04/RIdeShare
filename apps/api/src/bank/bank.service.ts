@@ -93,7 +93,7 @@ export class BankService {
       accountNumber: input.accountNumber,
       bankCode: input.bankCode,
       currency: "NGN",
-      description: "CommuteShare driver payout",
+      description: "RideShare driver payout",
     });
 
     if (

@@ -239,10 +239,12 @@ export class RideService {
     userId: string,
     input: SearchRidesInput,
   ): Promise<RideSearchResult[]> {
-    const passenger = await this.database.client.userProfile.findUnique({
-      where: { userId },
-      select: { gender: true },
-    });
+    const passenger = userId
+      ? await this.database.client.userProfile.findUnique({
+          where: { userId },
+          select: { gender: true },
+        })
+      : null;
     const canJoinWomenOnly = passenger?.gender === "WOMAN";
     const departureFrom = input.departureFrom
       ? new Date(input.departureFrom)

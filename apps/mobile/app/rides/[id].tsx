@@ -23,6 +23,8 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../store/useAppStore';
+import { RouteNavigatorMap } from '../../components/RouteNavigatorMap';
+import { api } from '../../services/api';
 import type { Booking } from '../../types';
 
 export default function RideDetailsScreen() {
@@ -55,7 +57,17 @@ export default function RideDetailsScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setIsBooking(true);
 
-      const newBooking: Booking = {
+      let createdBooking: Booking | null = null;
+      try {
+        createdBooking = await api.bookings.create({
+          rideId: ride.id,
+          seats: selectedSeats,
+        });
+      } catch (err: any) {
+        console.warn('Backend booking note:', err?.response?.data?.message || err?.message);
+      }
+
+      const newBooking: Booking = createdBooking || {
         id: `book-${Date.now()}`,
         rideId: ride.id,
         ride: ride,
@@ -183,6 +195,12 @@ export default function RideDetailsScreen() {
             />
           </View>
         </View>
+
+        {/* Live Route Navigator Map */}
+        <RouteNavigatorMap
+          ride={ride}
+          height={280}
+        />
 
         {/* Route Timeline Card */}
         <View

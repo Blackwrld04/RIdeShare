@@ -1,6 +1,6 @@
-# CommuteShare Backend
+# RideShare Backend
 
-Backend services for CommuteShare Nigeria.
+Backend services for RideShare Nigeria.
 
 ## Requirements
 

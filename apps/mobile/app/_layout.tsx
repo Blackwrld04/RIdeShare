@@ -6,15 +6,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppStore } from '../store/useAppStore';
 
 export default function RootLayout() {
-  const { themeMode, setThemeMode, theme } = useAppStore();
+  const { themeMode, theme, bootstrapAuth } = useAppStore();
 
   useEffect(() => {
-    // Restore saved theme on launch
-    AsyncStorage.getItem('@commuteshare_theme').then((saved) => {
-      if (saved === 'light' || saved === 'dark') {
-        setThemeMode(saved);
-      }
-    });
+    bootstrapAuth();
   }, []);
 
   return (
@@ -27,11 +22,14 @@ export default function RootLayout() {
           animation: 'slide_from_right',
         }}
       >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="welcome" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="auth/index" options={{ headerShown: false }} />
         <Stack.Screen name="auth/otp" options={{ headerShown: false }} />
         <Stack.Screen name="auth/profile" options={{ headerShown: false }} />
+        <Stack.Screen name="auth/register" options={{ headerShown: false }} />
         <Stack.Screen name="rides/create" options={{ headerShown: false }} />
         <Stack.Screen
           name="rides/[id]"

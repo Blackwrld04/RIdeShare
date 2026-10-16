@@ -58,8 +58,8 @@ export const Logo: React.FC<LogoProps> = ({
 
       {showText && (
         <View style={styles.textContainer}>
-          <Text style={[styles.brandText, { color: labelColor }]}>CommuteShare</Text>
-          <Text style={[styles.taglineText, { color: secondaryColor }]}>RIDE-SHARE</Text>
+          <Text style={[styles.brandText, { color: labelColor }]}>RideShare</Text>
+          <Text style={[styles.taglineText, { color: secondaryColor }]}>COMMUTE & CARPOOL</Text>
         </View>
       )}
     </View>

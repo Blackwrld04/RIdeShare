@@ -28,6 +28,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { RouteNavigatorMap } from '../../components/RouteNavigatorMap';
 import { api } from '../../services/api';
 
 export default function TrackingScreen() {
@@ -52,7 +53,7 @@ export default function TrackingScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const res = await api.safety.createShareLink(activeTrip?.rideId || 'ride-1');
       const text = encodeURIComponent(
-        `🚨 CommuteShare Live Trip: I am currently commuting with verified driver ${activeTrip?.ride.driverName} (${activeTrip?.ride.vehicle.model} - ${activeTrip?.ride.vehicle.registrationNumber}). Track my live coordinates & ETA here: ${res.shareUrl}`,
+        `🚨 RideShare Live Trip: I am currently commuting with verified driver ${activeTrip?.ride.driverName} (${activeTrip?.ride.vehicle.model} - ${activeTrip?.ride.vehicle.registrationNumber}). Track my live coordinates & ETA here: ${res.shareUrl}`,
       );
       Linking.openURL(`whatsapp://send?text=${text}`);
     } catch {
@@ -133,43 +134,11 @@ export default function TrackingScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Stylized Simulated Route Map Container (Sample Screen 2 Right) */}
-        <View
-          style={[
-            styles.mapSimulatedContainer,
-            { backgroundColor: themeMode === 'light' ? '#EAEFF5' : '#10131A' },
-          ]}
-        >
-          {/* Simulated Highway Polyline & Waypoints */}
-          <View style={styles.mapGraphicWrapper}>
-            <View style={styles.mapGridBackground}>
-              {/* Highway Corridor Line */}
-              <View style={styles.simulatedPolyline} />
-              {/* Pickup Marker */}
-              <View style={[styles.mapMarkerPickup, { borderColor: '#10B981' }]}>
-                <View style={styles.mapMarkerInnerGreen} />
-              </View>
-              {/* Driver Live Puck */}
-              <View style={styles.driverPuck}>
-                <Car size={16} color="#FFFFFF" />
-              </View>
-              {/* Destination Marker */}
-              <View style={[styles.mapMarkerDest, { borderColor: '#FF7A00' }]}>
-                <MapPin size={14} color="#FF7A00" fill="#FF7A00" />
-              </View>
-            </View>
-          </View>
-
-          {/* ETA Floating Pill (Sample Screen 2 Right) */}
-          <View style={styles.etaPillContainer}>
-            <View style={styles.etaPill}>
-              <View style={styles.pulseDot} />
-              <Text style={styles.etaText}>
-                The driver will arrive in... <Text style={styles.etaBold}>{etaMinutes}min</Text>
-              </Text>
-            </View>
-          </View>
-        </View>
+        {/* Live Route Navigator Map (whimsical-ferret style) */}
+        <RouteNavigatorMap
+          ride={ride}
+          height={320}
+        />
 
         {/* Live Distance & ETA Stat Bar */}
         <View style={[styles.statsRow, { backgroundColor: theme.surfaceCard, borderColor: theme.surfaceBorder }]}>
@@ -219,7 +188,6 @@ export default function TrackingScreen() {
               </Text>
               <View style={styles.ratingBadgeRow}>
                 <Badge label="★ 4.98" variant="rating" />
-                <Badge label="NIN Verified" variant="verified" />
               </View>
             </View>
 

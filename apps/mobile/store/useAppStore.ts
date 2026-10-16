@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lightTheme, darkTheme, type ThemeColors, type ThemeMode } from '../constants/theme';
 import type { Booking, EmergencyContact, RideOffer, UserProfile } from '../types';
+import { api } from '../services/api';
+import { DEMO_RIDES, ALL_DEMO_RIDES, DEMO_BOOKINGS, DEMO_EMERGENCY_CONTACTS, getRidesForState } from '../constants/demoData';
+import { getDefaultRouteForState } from '../constants/nigerianLocations';
 
 export interface AppState {
   // Theme
@@ -10,166 +13,70 @@ export interface AppState {
   toggleTheme: () => void;
   setThemeMode: (mode: ThemeMode) => void;
 
-  // Auth & Profile
+  // Auth & Session
   user: UserProfile | null;
   isAuthenticated: boolean;
+  isInitializing: boolean;
+  homeState: string;
+  setHomeState: (state: string) => void;
+  bootstrapAuth: () => Promise<void>;
   setUser: (user: UserProfile | null) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 
-  // Search State
+  // Route & Search Parameters
   searchOrigin: string;
   searchDest: string;
   searchDate: string;
   searchSeats: number;
   searchLandmark: string;
-  setSearchOrigin: (val: string) => void;
-  setSearchDest: (val: string) => void;
+  originCoords: { latitude: number; longitude: number };
+  destCoords: { latitude: number; longitude: number };
+  setSearchOrigin: (val: string, coords?: { latitude: number; longitude: number }) => void;
+  setSearchDest: (val: string, coords?: { latitude: number; longitude: number }) => void;
   swapRoute: () => void;
   setSearchDate: (val: string) => void;
   setSearchSeats: (val: number) => void;
   setSearchLandmark: (val: string) => void;
 
-  // Rides & Bookings
+  // Rides & Feed
   rides: RideOffer[];
+  isLoadingRides: boolean;
+  ridesError: string | null;
+  fetchRides: (customParams?: any) => Promise<void>;
+  addRide: (ride: RideOffer) => void;
+
+  // Bookings & Active Trips
   bookings: Booking[];
   activeTrip: Booking | null;
-  addRide: (ride: RideOffer) => void;
+  isLoadingTrips: boolean;
   addBooking: (booking: Booking) => void;
   setActiveTrip: (booking: Booking | null) => void;
+  fetchTrips: (view?: 'UPCOMING' | 'PAST' | 'CANCELLED') => Promise<void>;
 
-  // Emergency & Safety
+  // Safety & Emergency Contacts
   emergencyContacts: EmergencyContact[];
-  addEmergencyContact: (contact: EmergencyContact) => void;
-  removeEmergencyContact: (id: string) => void;
+  isLoadingContacts: boolean;
+  fetchEmergencyContacts: () => Promise<void>;
+  addEmergencyContact: (contact: { name: string; phoneE164: string; relationship: string }) => Promise<void>;
+  removeEmergencyContact: (id: string) => Promise<void>;
 }
 
-const mockInitialUser: UserProfile = {
-  id: 'usr-101',
-  phoneE164: '+2348031234567',
-  displayName: 'Alina Okafor',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-  bio: 'Daily corporate commuter from Berger to VI. Splitting fuel smartly.',
-  ninVerified: true,
-  ninLast4: '8821',
-  isDriver: true,
-  driverStatus: 'APPROVED',
-  rating: 4.95,
-  totalTrips: 34,
-};
+// Default Lagos Berger -> Lekki coordinate anchors
+const DEFAULT_ORIGIN = { label: 'Berger Bus Stop, Lagos', latitude: 6.6521, longitude: 3.3591 };
+const DEFAULT_DEST = { label: 'Admiralty Way, Lekki Phase 1', latitude: 6.4281, longitude: 3.4219 };
 
-const mockInitialRides: RideOffer[] = [
-  {
-    id: 'ride-1',
-    driverId: 'drv-201',
-    driverName: 'Olajide Abdulquadri',
-    driverAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-    driverRating: 4.98,
-    driverTripCount: 142,
-    ninVerified: true,
-    vehicle: {
-      make: 'Toyota',
-      model: 'Corolla 2018',
-      year: 2018,
-      color: 'Silver',
-      registrationNumber: 'LAG-492-AA',
-      seatCapacity: 4,
-    },
-    originTitle: 'Berger Bus Stop, Lagos',
-    originLandmark: 'Oando Filling Station, Berger',
-    destTitle: 'Admiralty Way, Lekki Phase 1',
-    destLandmark: 'Ebeano Supermarket, Lekki 1',
-    departureTime: new Date(Date.now() + 3600 * 1000 * 2).toISOString(),
-    estimatedArrival: new Date(Date.now() + 3600 * 1000 * 3.5).toISOString(),
-    passengerSeats: 3,
-    availableSeats: 2,
-    contributionKobo: 200000,
-    currency: 'NGN',
-    isRecurring: true,
-    isFemaleOnly: false,
-    amenities: ['Direct Highway', 'Air Conditioned', 'No Smoking', 'Music'],
-    status: 'SCHEDULED',
-  },
-  {
-    id: 'ride-2',
-    driverId: 'drv-202',
-    driverName: 'Fatima Sanusi',
-    driverAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
-    driverRating: 5.0,
-    driverTripCount: 88,
-    ninVerified: true,
-    vehicle: {
-      make: 'Hyundai',
-      model: 'Elantra',
-      year: 2021,
-      color: 'Pearl White',
-      registrationNumber: 'KJA-810-BQ',
-      seatCapacity: 4,
-    },
-    originTitle: 'Ikorodu Garage, Lagos',
-    originLandmark: 'Ikorodu BRT Terminal Gate 2',
-    destTitle: 'CMS / Marina, Lagos Island',
-    destLandmark: 'Sterling Towers, Marina',
-    departureTime: new Date(Date.now() + 3600 * 1000 * 4).toISOString(),
-    estimatedArrival: new Date(Date.now() + 3600 * 1000 * 5.2).toISOString(),
-    passengerSeats: 3,
-    availableSeats: 3,
-    contributionKobo: 180000,
-    currency: 'NGN',
-    isRecurring: true,
-    isFemaleOnly: true,
-    amenities: ['Women-Only', 'Air Conditioned', 'Quiet Ride', 'Bottled Water'],
-    status: 'SCHEDULED',
-  },
-  {
-    id: 'ride-3',
-    driverId: 'drv-203',
-    driverName: 'Emeka Nwosu',
-    driverAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-    driverRating: 4.88,
-    driverTripCount: 65,
-    ninVerified: true,
-    vehicle: {
-      make: 'Honda',
-      model: 'Civic',
-      year: 2019,
-      color: 'Midnight Blue',
-      registrationNumber: 'APP-304-LK',
-      seatCapacity: 4,
-    },
-    originTitle: 'Ajah / Sangotedo',
-    originLandmark: 'Shoprite Sangotedo Frontage',
-    destTitle: 'Ikoyi / Victoria Island',
-    destLandmark: 'Falomo Roundabout Underbridge',
-    departureTime: new Date(Date.now() + 3600 * 1000 * 6).toISOString(),
-    estimatedArrival: new Date(Date.now() + 3600 * 1000 * 7.5).toISOString(),
-    passengerSeats: 3,
-    availableSeats: 1,
-    contributionKobo: 150000,
-    currency: 'NGN',
-    isRecurring: false,
-    isFemaleOnly: false,
-    amenities: ['Air Conditioned', 'Luggage Space', 'Fast Lane Express'],
-    status: 'SCHEDULED',
-  },
-];
-
-const mockInitialBooking: Booking = {
-  id: 'book-901',
-  rideId: 'ride-1',
-  ride: mockInitialRides[0],
-  seatsBooked: 1,
-  status: 'IN_TRANSIT',
-  pickupLandmark: 'Oando Filling Station, Berger',
-  dropoffLandmark: 'Ebeano Supermarket, Lekki 1',
-  fareAmountKobo: 200000,
-  platformFeeKobo: 30000,
-  totalKobo: 230000,
-  paystackReference: 'PSTK-COMMUTE-984210',
-  createdAt: new Date().toISOString(),
-};
+function combineRides(primary: RideOffer[] = [], secondary: RideOffer[] = ALL_DEMO_RIDES): RideOffer[] {
+  const map = new Map<string, RideOffer>();
+  primary.forEach((r) => map.set(r.id, r));
+  secondary.forEach((r) => {
+    if (!map.has(r.id)) map.set(r.id, r);
+  });
+  return Array.from(map.values());
+}
 
 export const useAppStore = create<AppState>((set, get) => ({
-  themeMode: 'dark', // default to sleek Vanta dark as seen in the primary inspiration image, toggleable
+  // Theme management
+  themeMode: 'dark',
   theme: darkTheme,
   toggleTheme: () => {
     const nextMode = get().themeMode === 'light' ? 'dark' : 'light';
@@ -177,63 +84,263 @@ export const useAppStore = create<AppState>((set, get) => ({
       themeMode: nextMode,
       theme: nextMode === 'light' ? lightTheme : darkTheme,
     });
-    AsyncStorage.setItem('@commuteshare_theme', nextMode);
+    AsyncStorage.setItem('@rideshare_theme', nextMode);
   },
   setThemeMode: (mode: ThemeMode) => {
     set({
       themeMode: mode,
       theme: mode === 'light' ? lightTheme : darkTheme,
     });
-    AsyncStorage.setItem('@commuteshare_theme', mode);
+    AsyncStorage.setItem('@rideshare_theme', mode);
   },
 
-  user: mockInitialUser,
-  isAuthenticated: true,
-  setUser: (user) => set({ user, isAuthenticated: !!user }),
-  logout: () => set({ user: null, isAuthenticated: false }),
+  // Auth & Session
+  user: null,
+  isAuthenticated: false,
+  isInitializing: true,
+  homeState: 'Lagos',
 
-  searchOrigin: 'Berger Bus Stop, Lagos',
-  searchDest: 'Admiralty Way, Lekki Phase 1',
+  setHomeState: (stateName: string) => {
+    const defaults = getDefaultRouteForState(stateName);
+    const regionalRides = getRidesForState(stateName);
+    set((prev) => ({
+      homeState: stateName,
+      user: prev.user ? { ...prev.user, state: stateName } : null,
+      rides: combineRides(regionalRides, ALL_DEMO_RIDES),
+      searchOrigin: defaults.origin.label,
+      searchDest: defaults.destination.label,
+      searchLandmark: defaults.origin.landmark,
+      originCoords: { latitude: defaults.origin.latitude, longitude: defaults.origin.longitude },
+      destCoords: { latitude: defaults.destination.latitude, longitude: defaults.destination.longitude },
+    }));
+    AsyncStorage.setItem('@rideshare_home_state', stateName);
+  },
+
+  bootstrapAuth: async () => {
+    try {
+      const storedTheme = await AsyncStorage.getItem('@rideshare_theme');
+      if (storedTheme === 'light' || storedTheme === 'dark') {
+        set({
+          themeMode: storedTheme,
+          theme: storedTheme === 'light' ? lightTheme : darkTheme,
+        });
+      }
+
+      const storedHomeState = await AsyncStorage.getItem('@rideshare_home_state');
+      if (storedHomeState) {
+        const defaults = getDefaultRouteForState(storedHomeState);
+        const regionalRides = getRidesForState(storedHomeState);
+        set({
+          homeState: storedHomeState,
+          rides: combineRides(regionalRides, ALL_DEMO_RIDES),
+          searchOrigin: defaults.origin.label,
+          searchDest: defaults.destination.label,
+          searchLandmark: defaults.origin.landmark,
+          originCoords: { latitude: defaults.origin.latitude, longitude: defaults.origin.longitude },
+          destCoords: { latitude: defaults.destination.latitude, longitude: defaults.destination.longitude },
+        });
+      }
+
+      const token = await AsyncStorage.getItem('@rideshare_access_token');
+      if (!token) {
+        set({ user: null, isAuthenticated: false, isInitializing: false });
+        return;
+      }
+
+      const profile = await api.profile.get();
+      if (profile?.state) {
+        const defaults = getDefaultRouteForState(profile.state);
+        const regionalRides = getRidesForState(profile.state);
+        set({
+          homeState: profile.state,
+          rides: combineRides(regionalRides, ALL_DEMO_RIDES),
+          searchOrigin: defaults.origin.label,
+          searchDest: defaults.destination.label,
+          searchLandmark: defaults.origin.landmark,
+          originCoords: { latitude: defaults.origin.latitude, longitude: defaults.origin.longitude },
+          destCoords: { latitude: defaults.destination.latitude, longitude: defaults.destination.longitude },
+        });
+        AsyncStorage.setItem('@rideshare_home_state', profile.state);
+      }
+      set({ user: profile, isAuthenticated: true, isInitializing: false });
+    } catch (err) {
+      console.warn('Session restore failed or expired:', err);
+      await AsyncStorage.multiRemove(['@rideshare_access_token', '@rideshare_refresh_token']);
+      set({ user: null, isAuthenticated: false, isInitializing: false });
+    }
+  },
+
+  setUser: (user) => {
+    set((prev) => {
+      const updatedState = user?.state || prev.homeState;
+      if (user?.state) {
+        AsyncStorage.setItem('@rideshare_home_state', user.state);
+      }
+      return {
+        user,
+        isAuthenticated: !!user,
+        homeState: updatedState,
+      };
+    });
+  },
+
+  logout: async () => {
+    await api.auth.logout();
+    set({ user: null, isAuthenticated: false, bookings: [], activeTrip: null });
+  },
+
+  // Route & Search Coordinates
+  searchOrigin: DEFAULT_ORIGIN.label,
+  searchDest: DEFAULT_DEST.label,
   searchDate: 'Today',
   searchSeats: 1,
   searchLandmark: 'Oando Filling Station, Berger',
-  setSearchOrigin: (searchOrigin) => set({ searchOrigin }),
-  setSearchDest: (searchDest) => set({ searchDest }),
+  originCoords: { latitude: DEFAULT_ORIGIN.latitude, longitude: DEFAULT_ORIGIN.longitude },
+  destCoords: { latitude: DEFAULT_DEST.latitude, longitude: DEFAULT_DEST.longitude },
+
+  setSearchOrigin: (searchOrigin, coords) =>
+    set((state) => ({
+      searchOrigin,
+      originCoords: coords || state.originCoords,
+    })),
+
+  setSearchDest: (searchDest, coords) =>
+    set((state) => ({
+      searchDest,
+      destCoords: coords || state.destCoords,
+    })),
+
   swapRoute: () => {
-    const { searchOrigin, searchDest } = get();
-    set({ searchOrigin: searchDest, searchDest: searchOrigin });
+    const { searchOrigin, searchDest, originCoords, destCoords } = get();
+    set({
+      searchOrigin: searchDest,
+      searchDest: searchOrigin,
+      originCoords: destCoords,
+      destCoords: originCoords,
+    });
   },
+
   setSearchDate: (searchDate) => set({ searchDate }),
   setSearchSeats: (searchSeats) => set({ searchSeats }),
   setSearchLandmark: (searchLandmark) => set({ searchLandmark }),
 
-  rides: mockInitialRides,
-  bookings: [mockInitialBooking],
-  activeTrip: mockInitialBooking,
-  addRide: (ride) => set((state) => ({ rides: [ride, ...state.rides] })),
-  addBooking: (booking) => set((state) => ({ bookings: [booking, ...state.bookings], activeTrip: booking })),
+  // Rides & Feed
+  rides: ALL_DEMO_RIDES,
+  isLoadingRides: false,
+  ridesError: null,
+
+  fetchRides: async (customParams) => {
+    const { originCoords, destCoords, searchSeats, homeState, searchOrigin, searchDest } = get();
+    set({ isLoadingRides: true, ridesError: null });
+
+    try {
+      const departureFrom = new Date().toISOString();
+      const departureTo = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString();
+      const params = {
+        originLatitude: customParams?.originLatitude ?? originCoords.latitude,
+        originLongitude: customParams?.originLongitude ?? originCoords.longitude,
+        destinationLatitude: customParams?.destinationLatitude ?? destCoords.latitude,
+        destinationLongitude: customParams?.destinationLongitude ?? destCoords.longitude,
+        radiusMeters: customParams?.radiusMeters ?? 25000,
+        seats: customParams?.seats ?? searchSeats,
+        departureFrom,
+        departureTo,
+        ...customParams,
+      };
+
+      const results = await api.rides.search(params);
+      const regionalRides = getRidesForState(homeState, { origin: searchOrigin, dest: searchDest });
+      const combined = combineRides(results || [], combineRides(regionalRides, ALL_DEMO_RIDES));
+      set({ rides: combined, isLoadingRides: false });
+    } catch (err: any) {
+      console.warn('Backend rides search fallback to verified regional and corridor rides:', err?.message);
+      const regionalRides = getRidesForState(homeState, { origin: searchOrigin, dest: searchDest });
+      set({
+        rides: combineRides(regionalRides, ALL_DEMO_RIDES),
+        isLoadingRides: false,
+      });
+    }
+  },
+
+  addRide: (ride) =>
+    set((state) => ({
+      rides: [ride, ...state.rides],
+    })),
+
+  // Bookings & Trips
+  bookings: DEMO_BOOKINGS,
+  activeTrip: DEMO_BOOKINGS[0],
+  isLoadingTrips: false,
+
+  addBooking: (booking) =>
+    set((state) => ({
+      bookings: [booking, ...state.bookings],
+      activeTrip: booking,
+    })),
+
   setActiveTrip: (activeTrip) => set({ activeTrip }),
 
-  emergencyContacts: [
-    {
-      id: 'em-1',
-      name: 'Adewale Okafor (Brother)',
-      phoneE164: '+2348023456789',
-      relationship: 'Brother',
-      isPrimary: true,
-    },
-    {
-      id: 'em-2',
-      name: 'Dr. Ifeoma Okafor (Mother)',
-      phoneE164: '+2348098765432',
-      relationship: 'Mother',
-      isPrimary: false,
-    },
-  ],
-  addEmergencyContact: (contact) =>
-    set((state) => ({ emergencyContacts: [...state.emergencyContacts, contact] })),
-  removeEmergencyContact: (id) =>
-    set((state) => ({
-      emergencyContacts: state.emergencyContacts.filter((c) => c.id !== id),
-    })),
+  fetchTrips: async (view = 'UPCOMING') => {
+    set({ isLoadingTrips: true });
+    try {
+      const result = await api.trips.getTracker(view);
+      const remoteBookings = result?.passengerBookings || [];
+      if (remoteBookings.length > 0) {
+        const combined = [...remoteBookings];
+        DEMO_BOOKINGS.forEach((db) => {
+          if (!combined.some((b) => b.id === db.id)) {
+            combined.push(db);
+          }
+        });
+        const active = combined.find((t) => t.status === 'CONFIRMED' || t.status === 'IN_TRANSIT') || combined[0] || null;
+        set({ bookings: combined, activeTrip: active, isLoadingTrips: false });
+      } else {
+        const active = DEMO_BOOKINGS.find((t) => t.status === 'CONFIRMED' || t.status === 'IN_TRANSIT') || DEMO_BOOKINGS[0] || null;
+        set({ bookings: DEMO_BOOKINGS, activeTrip: active, isLoadingTrips: false });
+      }
+    } catch (err) {
+      const active = DEMO_BOOKINGS.find((t) => t.status === 'CONFIRMED' || t.status === 'IN_TRANSIT') || DEMO_BOOKINGS[0] || null;
+      set({ bookings: DEMO_BOOKINGS, activeTrip: active, isLoadingTrips: false });
+    }
+  },
+
+  // Emergency & Safety
+  emergencyContacts: DEMO_EMERGENCY_CONTACTS,
+  isLoadingContacts: false,
+
+  fetchEmergencyContacts: async () => {
+    set({ isLoadingContacts: true });
+    try {
+      const contacts = await api.safety.getContacts();
+      if (contacts && contacts.length > 0) {
+        set({ emergencyContacts: contacts, isLoadingContacts: false });
+      } else {
+        set({ emergencyContacts: DEMO_EMERGENCY_CONTACTS, isLoadingContacts: false });
+      }
+    } catch (err) {
+      set({ emergencyContacts: DEMO_EMERGENCY_CONTACTS, isLoadingContacts: false });
+    }
+  },
+
+  addEmergencyContact: async (contact) => {
+    try {
+      const created = await api.safety.addContact(contact);
+      set((state) => ({ emergencyContacts: [...state.emergencyContacts, created] }));
+    } catch (err) {
+      console.error('Failed to add emergency contact:', err);
+      throw err;
+    }
+  },
+
+  removeEmergencyContact: async (id) => {
+    try {
+      await api.safety.deleteContact(id);
+      set((state) => ({
+        emergencyContacts: state.emergencyContacts.filter((c) => c.id !== id),
+      }));
+    } catch (err) {
+      console.error('Failed to delete emergency contact:', err);
+      throw err;
+    }
+  },
 }));

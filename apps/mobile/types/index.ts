@@ -4,8 +4,13 @@ export interface UserProfile {
   id: string;
   phoneE164: string;
   displayName: string;
+  email?: string;
+  billingEmail?: string;
   avatarUrl?: string;
   bio?: string;
+  state?: string;
+  city?: string;
+  gender?: 'WOMAN' | 'MAN' | 'NON_BINARY' | 'PREFER_NOT_TO_SAY';
   ninVerified: boolean;
   ninLast4?: string;
   isDriver: boolean;
@@ -101,4 +106,116 @@ export interface SafetyAlert {
   longitude: number;
   createdAt: string;
   emergencyNumber: string;
+}
+
+export interface NotificationItem {
+  id: string;
+  kind: string;
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+  readAt?: string | null;
+  createdAt: string;
+}
+
+export interface SafeLandmarkItem {
+  id: string;
+  name: string;
+  address: string;
+  category: string;
+  city: string;
+  state: string;
+  latitude: number;
+  longitude: number;
+  safetyNotes?: string | null;
+  isActive: boolean;
+}
+
+export interface BankItem {
+  name: string;
+  code: string;
+  slug?: string;
+  active: boolean;
+}
+
+export interface BankAccountItem {
+  id: string;
+  accountNumberMasked: string;
+  accountName: string;
+  bankName: string;
+  bankCode: string;
+  isVerified: boolean;
+}
+
+export interface LedgerJournalItem {
+  id: string;
+  kind: string;
+  reference: string;
+  description?: string;
+  createdAt: string;
+  amountKobo: number;
+}
+
+export interface DriverPayoutItem {
+  id: string;
+  reference: string;
+  amountKobo: number;
+  currency: string;
+  status: 'SCHEDULED' | 'PROCESSING' | 'SUBMITTED' | 'SUCCESS' | 'FAILED' | 'ON_HOLD' | 'REVERSED' | 'CANCELLED';
+  scheduledFor: string;
+  bankAccount: BankAccountItem;
+}
+
+export interface DisputeItem {
+  id: string;
+  bookingId: string;
+  reason: string;
+  status: 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED' | 'DISMISSED';
+  createdAt: string;
+}
+
+export interface RideReviewItem {
+  id: string;
+  bookingId: string;
+  authorId: string;
+  subjectId: string;
+  rating: number;
+  comment?: string;
+  createdAt: string;
+}
+
+export interface UserReportItem {
+  id: string;
+  bookingId: string;
+  category: 'SAFETY' | 'HARASSMENT' | 'FRAUD' | 'NO_SHOW' | 'OTHER';
+  details: string;
+  status: 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED' | 'DISMISSED';
+  createdAt: string;
+}
+
+export interface DriverApplicationItem {
+  id: string;
+  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+  legalFirstName?: string;
+  legalLastName?: string;
+  dateOfBirth?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  vehicle?: DriverVehicle;
+  documents?: Array<{
+    id: string;
+    kind: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    expiresOn?: string;
+  }>;
+}
+
+export interface TripShareItem {
+  id: string;
+  token: string;
+  label?: string;
+  expiresAt: string;
+  revokedAt?: string | null;
+  shareUrl: string;
 }

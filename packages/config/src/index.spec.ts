@@ -82,7 +82,7 @@ describe("loadConfig", () => {
       SAFETY_SHARE_MAX_HOURS: 168,
       LOCATION_PING_MIN_INTERVAL_SECONDS: 2,
       GEOCODING_BASE_URL: "https://nominatim.openstreetmap.org",
-      GEOCODING_USER_AGENT: "CommuteShare/1.0",
+      GEOCODING_USER_AGENT: "RideShare/1.0",
       GEOCODING_CACHE_SECONDS: 604_800,
       PAYOUT_DELAY_HOURS: 24,
       PAYOUT_RECONCILIATION_SECONDS: 60,

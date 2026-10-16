@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, CheckCircle2, ChevronLeft } from 'lucide-react-native';
 import { useAppStore } from '../../store/useAppStore';
 import { Button } from '../../components/ui/Button';
+import { api } from '../../services/api';
 
 const genders = ['Woman', 'Man', 'Prefer not to say'];
 
@@ -25,7 +26,7 @@ export default function ProfileSetupScreen() {
 
   const isNinValid = useMemo(() => /^[0-9]{11}$/.test(nin), [nin]);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!name.trim()) {
       Alert.alert('Name required', 'Please provide your full name.');
       return;
@@ -34,6 +35,17 @@ export default function ProfileSetupScreen() {
     if (nin && !isNinValid) {
       Alert.alert('Invalid NIN', 'NIN should be exactly 11 digits to pass the NIMC check.');
       return;
+    }
+
+    const mappedGender = gender === 'Woman' ? 'WOMAN' : gender === 'Man' ? 'MAN' : 'PREFER_NOT_TO_SAY';
+    try {
+      await api.profile.update({
+        displayName: name.trim(),
+        gender: mappedGender as any,
+        bio: gender === 'Woman' ? 'Women-first commuting with verified daily routes.' : 'Comfortable commuting with a safe, trusted network.',
+      });
+    } catch (e) {
+      console.warn('Backend profile update note:', e);
     }
 
     const nextUser = {

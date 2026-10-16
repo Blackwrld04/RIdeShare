@@ -13,6 +13,7 @@ import {
 } from "@nestjs/common";
 import {
   AccessTokenGuard,
+  OptionalAuth,
   type AuthenticatedRequest,
 } from "../auth/access-token.guard.js";
 import { ZodValidationPipe } from "../shared/zod-validation.pipe.js";
@@ -52,11 +53,12 @@ export class RideController {
   }
 
   @Get("search")
+  @OptionalAuth()
   search(
     @Req() request: AuthenticatedRequest,
     @Query(new ZodValidationPipe(searchRidesSchema)) input: SearchRidesInput,
   ): Promise<RideSearchResult[]> {
-    return this.rides.search(request.auth.userId, input);
+    return this.rides.search(request.auth?.userId || "", input);
   }
 
   @Get(":rideId")

@@ -45,7 +45,7 @@ describe("PaystackTransferClient", () => {
         currency: "NGN",
         recipientCode: "RCP_testrecipient",
         reference: "csp_1234567890123456",
-        reason: "CommuteShare ride payout",
+        reason: "RideShare ride payout",
       }),
     ).resolves.toMatchObject({
       amountKobo: 200_000,

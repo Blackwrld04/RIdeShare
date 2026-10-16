@@ -21,7 +21,7 @@ describeIntegration("safe landmark integration", () => {
     database = createDatabase(databaseUrl);
     locations = new LocationService(database as unknown as DatabaseService);
     const landmark = await locations.create({
-      name: "CommuteShare Yaba Hub",
+      name: "RideShare Yaba Hub",
       address: "Yaba Bus Terminal, Lagos",
       category: "transport_hub",
       city: "Lagos",
@@ -42,7 +42,7 @@ describeIntegration("safe landmark integration", () => {
 
   it("finds active hubs by text and proximity", async () => {
     const results = await locations.search({
-      q: "CommuteShare Yaba",
+      q: "RideShare Yaba",
       latitude: 6.5096,
       longitude: 3.3712,
       radiusMeters: 1_000,
@@ -98,7 +98,7 @@ describeIntegration("safe landmark integration", () => {
     await locations.update(landmarkId, { isActive: false });
     await expect(
       locations.search({
-        q: "CommuteShare Yaba",
+        q: "RideShare Yaba",
         radiusMeters: 10_000,
         limit: 20,
       }),

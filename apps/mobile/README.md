@@ -1,6 +1,6 @@
-# CommuteShare Nigeria — Mobile App (React Native & Expo Go)
+# RideShare Nigeria — Mobile App (React Native & Expo Go)
 
-CommuteShare Nigeria is a corridor-matched carpooling mobile application localized for Nigerian commuters (Lagos corridors e.g., Berger $\leftrightarrow$ Lekki, Ikorodu $\leftrightarrow$ CMS, Ajah $\leftrightarrow$ Ikoyi; Abuja corridors e.g., Kubwa $\leftrightarrow$ CBD; Intercity e.g., Lagos $\leftrightarrow$ Ibadan).
+RideShare Nigeria is a corridor-matched carpooling mobile application localized for Nigerian commuters (Lagos corridors e.g., Berger $\leftrightarrow$ Lekki, Ikorodu $\leftrightarrow$ CMS, Ajah $\leftrightarrow$ Ikoyi; Abuja corridors e.g., Kubwa $\leftrightarrow$ CBD; Intercity e.g., Lagos $\leftrightarrow$ Ibadan).
 
 ---
 
@@ -24,7 +24,7 @@ npx expo start
 ### 3. Open in Expo Go on Android
 1. Open the **Expo Go** app on your Android phone.
 2. Tap **"Scan QR code"** and point your camera at the QR code displayed in your terminal.
-3. The bundle will load and the CommuteShare app will launch!
+3. The bundle will load and the RideShare app will launch!
 
 ---
 

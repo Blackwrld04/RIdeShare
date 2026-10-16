@@ -49,6 +49,11 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
     }
   };
 
+  // Only render routes that have not been hidden via href: null and exclude post tab
+  const visibleRoutes = state.routes.filter(
+    (route: any) => descriptors[route.key]?.options?.href !== null && route.name !== 'post'
+  );
+
   return (
     <View
       style={[
@@ -69,9 +74,9 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           },
         ]}
       >
-        {state.routes.map((route: any, index: number) => {
+        {visibleRoutes.map((route: any) => {
           const { options } = descriptors[route.key];
-          const isFocused = state.index === index;
+          const isFocused = state.routes[state.index]?.key === route.key;
 
           const onPress = () => {
             try {
@@ -136,6 +141,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="trips" options={{ title: 'Trips' }} />
       <Tabs.Screen name="chat" options={{ title: 'Chat' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      <Tabs.Screen name="post" options={{ title: 'Post', href: null }} />
     </Tabs>
   );
 }

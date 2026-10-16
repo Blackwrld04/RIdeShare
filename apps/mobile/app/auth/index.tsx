@@ -51,7 +51,7 @@ export default function AuthLandingScreen() {
             <Text style={[styles.backText, { color: theme.textPrimary }]}>←</Text>
           </TouchableOpacity>
           <View style={[styles.brandPill, { backgroundColor: theme.surfaceCard, borderColor: theme.surfaceBorder }]}> 
-            <Text style={[styles.brandText, { color: theme.textPrimary }]}>CommuteShare</Text>
+            <Text style={[styles.brandText, { color: theme.textPrimary }]}>RideShare</Text>
           </View>
         </View>
 

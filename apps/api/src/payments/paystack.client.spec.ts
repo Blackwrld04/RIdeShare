@@ -199,7 +199,7 @@ describe("HttpPaystackClient", () => {
         accountNumber: "0123456789",
         bankCode: "058",
         currency: "NGN",
-        description: "CommuteShare driver payout",
+        description: "RideShare driver payout",
       }),
     ).resolves.toMatchObject({
       recipientCode: "RCP_testrecipient",

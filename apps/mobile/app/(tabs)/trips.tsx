@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -20,27 +20,46 @@ import {
   CheckCircle2,
   Clock,
   ShieldCheck,
+  Star,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../store/useAppStore';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { RouteNavigatorMap } from '../../components/RouteNavigatorMap';
 import { api } from '../../services/api';
 
 type TabView = 'UPCOMING' | 'PAST' | 'CANCELLED';
 
 export default function TripsScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, themeMode, bookings, activeTrip } = useAppStore();
+  const { theme, themeMode, bookings, activeTrip, setActiveTrip, fetchTrips } = useAppStore();
   const [activeTab, setActiveTab] = useState<TabView>('UPCOMING');
+
+  useEffect(() => {
+    fetchTrips(activeTab);
+  }, [activeTab]);
+
+  const upcomingBookings = React.useMemo(() => {
+    return bookings.filter(
+      (b) => b.status === 'CONFIRMED' || b.status === 'IN_TRANSIT' || b.status === 'PENDING'
+    );
+  }, [bookings]);
+
+  const currentActiveTrip = React.useMemo(() => {
+    if (activeTrip && (activeTrip.status === 'IN_TRANSIT' || activeTrip.status === 'CONFIRMED')) {
+      return activeTrip;
+    }
+    return upcomingBookings[0] || null;
+  }, [activeTrip, upcomingBookings]);
 
   const handleShareWhatsApp = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const res = await api.safety.createShareLink(activeTrip?.rideId || 'ride-1');
+      const res = await api.safety.createShareLink(currentActiveTrip?.rideId || 'ride-1');
       const text = encodeURIComponent(
-        `Hi! I am sharing my live CommuteShare trip with driver ${activeTrip?.ride.driverName || 'Olajide'} (${activeTrip?.ride.vehicle.model} - ${activeTrip?.ride.vehicle.registrationNumber}). Track my live journey safely here: ${res.shareUrl}`,
+        `Hi! I am sharing my live RideShare trip with driver ${currentActiveTrip?.ride.driverName || 'Olajide'} (${currentActiveTrip?.ride.vehicle.model} - ${currentActiveTrip?.ride.vehicle.registrationNumber}). Track my live journey safely here: ${res.shareUrl}`,
       );
       Linking.openURL(`whatsapp://send?text=${text}`);
     } catch {
@@ -63,7 +82,7 @@ export default function TripsScreen() {
           style: 'destructive',
           onPress: () => {
             Linking.openURL('tel:112');
-            api.safety.triggerSos(activeTrip?.rideId || 'ride-1', 6.6018, 3.3515);
+            api.safety.triggerSos(currentActiveTrip?.rideId || 'ride-1', 6.6018, 3.3515);
           },
         },
       ],
@@ -72,6 +91,57 @@ export default function TripsScreen() {
 
   const handleCallDriver = () => {
     Linking.openURL('tel:+2348030000000');
+  };
+
+  const handleReviewDriver = (bookingId: string) => {
+    Alert.alert('Rate Your Driver', 'Select your experience rating:', [
+      {
+        text: '★★★★★ 5 Stars',
+        onPress: async () => {
+          try {
+            await api.reviews.create(bookingId, 5, 'Punctual, clean vehicle, excellent driving.');
+            Alert.alert('Rating Submitted', 'Thank you for keeping RideShare safe and trusted!');
+          } catch (e: any) {
+            Alert.alert('Review', e?.response?.data?.message || 'Review recorded.');
+          }
+        },
+      },
+      {
+        text: '★★★★☆ 4 Stars',
+        onPress: async () => {
+          try {
+            await api.reviews.create(bookingId, 4, 'Good trip.');
+            Alert.alert('Rating Submitted', 'Thank you for your feedback!');
+          } catch (e: any) {
+            Alert.alert('Review', e?.response?.data?.message || 'Review recorded.');
+          }
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const handleOpenDispute = (bookingId: string) => {
+    Alert.alert(
+      'Open Payment Dispute',
+      'Filing a dispute places the driver payout on hold for 24 hours while an admin reviews your case. Would you like to proceed?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'File Dispute',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.disputes.create(bookingId, 'Passenger dispute filed regarding ride departure or route variance.');
+              Alert.alert('Dispute Registered', 'Your dispute is now under reviewer investigation. The escrow payout is on hold.');
+              fetchTrips(activeTab);
+            } catch (e: any) {
+              Alert.alert('Dispute Status', e?.response?.data?.message || 'Dispute logged.');
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -134,20 +204,8 @@ export default function TripsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {activeTab === 'UPCOMING' && activeTrip && (
+        {activeTab === 'UPCOMING' && currentActiveTrip && (
           <View style={styles.activeTripWrapper}>
-            {/* Status Pill & Route Header */}
-            <View style={styles.statusRow}>
-              <View style={styles.inTransitPill}>
-                <View style={styles.blinkingDot} />
-                <Text style={styles.inTransitText}>
-                  IN TRANSIT • Heading to {activeTrip.ride.destTitle.split(',')[0]}
-                </Text>
-              </View>
-              <Text style={[styles.tripIdText, { color: theme.textMuted }]}>
-                #NG-8492
-              </Text>
-            </View>
 
             {/* State Progress Chain (PRD 11 & 17.2) */}
             <View
@@ -185,11 +243,10 @@ export default function TripsScreen() {
               <View style={styles.cockpitDriverRow}>
                 <View style={styles.cockpitMeta}>
                   <Text style={[styles.cockpitDriverName, { color: theme.textPrimary }]}>
-                    Driver: {activeTrip.ride.driverName}
+                    Driver: {currentActiveTrip.ride.driverName}
                   </Text>
                   <View style={styles.badgeRow}>
                     <Badge label="★ 4.98" variant="rating" />
-                    <Badge label="NIN Verified" variant="verified" />
                   </View>
                 </View>
               </View>
@@ -197,8 +254,8 @@ export default function TripsScreen() {
               <View style={[styles.carDetailRow, { backgroundColor: theme.surfaceInput }]}>
                 <Car size={16} color="#FF7A00" />
                 <Text style={[styles.carDetailText, { color: theme.textPrimary }]}>
-                  {activeTrip.ride.vehicle.color} {activeTrip.ride.vehicle.model} • [
-                  {activeTrip.ride.vehicle.registrationNumber}]
+                  {currentActiveTrip.ride.vehicle.color} {currentActiveTrip.ride.vehicle.model} • [
+                  {currentActiveTrip.ride.vehicle.registrationNumber}]
                 </Text>
               </View>
 
@@ -211,9 +268,15 @@ export default function TripsScreen() {
                   numberOfLines={1}
                   style={[styles.meetingSpotValue, { color: theme.textPrimary }]}
                 >
-                  {activeTrip.pickupLandmark}
+                  {currentActiveTrip.pickupLandmark}
                 </Text>
               </View>
+
+              {/* Live Highway Corridor Navigator Map */}
+              <RouteNavigatorMap
+                ride={currentActiveTrip.ride}
+                height={240}
+              />
 
               {/* Action Buttons: Chat & Call Driver */}
               <View style={styles.actionButtonsRow}>
@@ -221,7 +284,7 @@ export default function TripsScreen() {
                   title="Open Trip Chat"
                   variant="dark"
                   icon={<MessageSquare size={16} color={themeMode === 'light' ? '#FFFFFF' : '#090A0E'} />}
-                  onPress={() => router.push(`/chat/${activeTrip.id}`)}
+                  onPress={() => router.push(`/chat/${currentActiveTrip.id}`)}
                   style={styles.chatButton}
                 />
                 <Button
@@ -238,7 +301,7 @@ export default function TripsScreen() {
                 title="Open Live GPS & ETA Cockpit"
                 variant="primary"
                 icon={<Navigation size={16} color="#FFFFFF" />}
-                onPress={() => router.push(`/tracking/${activeTrip.id}`)}
+                onPress={() => router.push(`/tracking/${currentActiveTrip.id}`)}
                 style={styles.liveCockpitBtn}
               />
             </Card>
@@ -294,19 +357,197 @@ export default function TripsScreen() {
                 </View>
               </TouchableOpacity>
             </View>
+
+            {/* Additional Upcoming Bookings if any */}
+            {upcomingBookings.filter((b) => b.id !== currentActiveTrip.id).length > 0 && (
+              <View style={{ marginTop: 22 }}>
+                <Text style={{ color: theme.textPrimary, fontSize: 16, fontWeight: '800', marginBottom: 12 }}>
+                  Additional Upcoming Trips
+                </Text>
+                {upcomingBookings
+                  .filter((b) => b.id !== currentActiveTrip.id)
+                  .map((item) => (
+                    <Card key={item.id} style={{ marginBottom: 14, padding: 16 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 16 }}>
+                          {item.ride?.driverName || 'Verified Commuter'}
+                        </Text>
+                        <Badge label={item.status} variant="status" />
+                      </View>
+                      <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 4 }}>
+                        {item.pickupLandmark} → {item.dropoffLandmark}
+                      </Text>
+                      <Text style={{ color: theme.textSecondary, fontSize: 13, marginBottom: 12 }}>
+                        Seats Booked: {item.seatsBooked} • Escrow: ₦{((item.totalKobo || 0) / 100).toLocaleString()}
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 10 }}>
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={() => setActiveTrip(item)}
+                          style={{
+                            flex: 1,
+                            backgroundColor: theme.surfaceSecondary,
+                            paddingVertical: 10,
+                            borderRadius: 10,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ color: theme.textPrimary, fontWeight: '600', fontSize: 13 }}>
+                            Track in Cockpit
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={() => router.push(`/chat/${item.id}`)}
+                          style={{
+                            flex: 1,
+                            backgroundColor: theme.primary,
+                            paddingVertical: 10,
+                            borderRadius: 10,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ color: theme.primaryForeground, fontWeight: '600', fontSize: 13 }}>
+                            Message Driver
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </Card>
+                  ))}
+              </View>
+            )}
           </View>
         )}
 
-        {/* Empty States for Past / Cancelled */}
-        {activeTab !== 'UPCOMING' && (
+        {/* Empty State for Upcoming */}
+        {activeTab === 'UPCOMING' && !currentActiveTrip && (
           <View style={styles.emptyState}>
-            <Clock size={40} color={theme.textMuted} />
+            <Car size={40} color={theme.textMuted} />
             <Text style={[styles.emptyStateTitle, { color: theme.textPrimary }]}>
-              No {activeTab.toLowerCase()} trips
+              No upcoming trips
             </Text>
             <Text style={[styles.emptyStateSub, { color: theme.textMuted }]}>
-              Completed and settled rides will appear here with full Paystack escrow receipts.
+              You have no active rides right now. Search highway corridors or book a ride from Home.
             </Text>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.push('/(tabs)')}
+              style={{
+                marginTop: 18,
+                backgroundColor: theme.primary,
+                paddingHorizontal: 20,
+                paddingVertical: 12,
+                borderRadius: 14,
+              }}
+            >
+              <Text style={{ color: theme.primaryForeground, fontWeight: '700', fontSize: 14 }}>
+                Find a Corridor Ride
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Past Trips List */}
+        {activeTab === 'PAST' && (
+          <View>
+            {bookings.filter((b) => b.status === 'COMPLETED').length === 0 ? (
+              <View style={styles.emptyState}>
+                <Clock size={40} color={theme.textMuted} />
+                <Text style={[styles.emptyStateTitle, { color: theme.textPrimary }]}>
+                  No past trips
+                </Text>
+                <Text style={[styles.emptyStateSub, { color: theme.textMuted }]}>
+                  Completed and settled rides will appear here with full Paystack escrow receipts.
+                </Text>
+              </View>
+            ) : (
+              bookings
+                .filter((b) => b.status === 'COMPLETED')
+                .map((item) => (
+                  <Card key={item.id} style={{ marginBottom: 14, padding: 16 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 16 }}>
+                        {item.ride?.driverName || 'Verified Commuter'}
+                      </Text>
+                      <Badge label="COMPLETED" variant="status" />
+                    </View>
+                    <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 4 }}>
+                      {item.pickupLandmark} → {item.dropoffLandmark}
+                    </Text>
+                    <Text style={{ color: theme.textSecondary, fontSize: 13, marginBottom: 12 }}>
+                      Total Escrow Settled: ₦{((item.totalKobo || 0) / 100).toLocaleString()}
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => handleReviewDriver(item.id)}
+                        style={{
+                          flex: 1,
+                          backgroundColor: theme.surfaceSecondary,
+                          paddingVertical: 10,
+                          borderRadius: 10,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ color: theme.textPrimary, fontWeight: '600', fontSize: 13 }}>
+                          ★ Rate Driver
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => handleOpenDispute(item.id)}
+                        style={{
+                          flex: 1,
+                          backgroundColor: '#EF444422',
+                          paddingVertical: 10,
+                          borderRadius: 10,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ color: '#EF4444', fontWeight: '600', fontSize: 13 }}>
+                          Dispute Escrow
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </Card>
+                ))
+            )}
+          </View>
+        )}
+
+        {/* Cancelled Trips List */}
+        {activeTab === 'CANCELLED' && (
+          <View>
+            {bookings.filter((b) => b.status === 'CANCELLED').length === 0 ? (
+              <View style={styles.emptyState}>
+                <Clock size={40} color={theme.textMuted} />
+                <Text style={[styles.emptyStateTitle, { color: theme.textPrimary }]}>
+                  No cancelled trips
+                </Text>
+                <Text style={[styles.emptyStateSub, { color: theme.textMuted }]}>
+                  Cancelled trips and Paystack refund statuses will appear here.
+                </Text>
+              </View>
+            ) : (
+              bookings
+                .filter((b) => b.status === 'CANCELLED')
+                .map((item) => (
+                  <Card key={item.id} style={{ marginBottom: 14, padding: 16 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 16 }}>
+                        {item.ride?.driverName || 'Ride Booking'}
+                      </Text>
+                      <Badge label="CANCELLED" variant="status" />
+                    </View>
+                    <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 4 }}>
+                      {item.pickupLandmark} → {item.dropoffLandmark}
+                    </Text>
+                    <Text style={{ color: '#10B981', fontSize: 13 }}>
+                      Refund: ₦{((item.totalKobo || 0) / 100).toLocaleString()} (Processed to Paystack Source)
+                    </Text>
+                  </Card>
+                ))
+            )}
           </View>
         )}
       </ScrollView>

@@ -69,12 +69,12 @@ function Draw-Logo {
         $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
 
         $textRect = New-Object System.Drawing.RectangleF(0, [float]($cy + $scale * 0.95), [float]$width, [float]($fontSize * 1.8))
-        $g.DrawString('COMMUTESHARE', $font, $textBrush, $textRect, $sf)
+        $g.DrawString('RIDESHARE', $font, $textBrush, $textRect, $sf)
 
         $subFont = New-Object System.Drawing.Font($fontFamily, [float]($fontSize * 0.42), [System.Drawing.FontStyle]::Regular)
         $subBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(180, 150, 155, 165))
         $subRect = New-Object System.Drawing.RectangleF(0, [float]($cy + $scale * 0.95 + $fontSize * 1.8), [float]$width, [float]($fontSize * 1.4))
-        $g.DrawString('CARPOOL & RIDE-SHARE', $subFont, $subBrush, $subRect, $sf)
+        $g.DrawString('COMMUTE & CARPOOL', $subFont, $subBrush, $subRect, $sf)
     }
 
     $bmp.Save($outputPath, [System.Drawing.Imaging.ImageFormat]::Png)
