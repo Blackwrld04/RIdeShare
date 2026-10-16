@@ -100,7 +100,7 @@ export default function WelcomeScreen() {
     >
       {/* Full-Page Background Image covering the entire screen */}
       <Image
-        source={require('../assets/welcome_full_bg.jpg')}
+        source={require('../assets/welcome_screen_bg.jpg')}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
       />
