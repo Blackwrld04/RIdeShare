@@ -62,7 +62,7 @@ jobs:
       - name: Install Mobile Dependencies
         working-directory: apps/mobile
         run: |
-          npm install
+          npm install --legacy-peer-deps
 
       - name: Export Web Frontend Bundle
         working-directory: apps/mobile

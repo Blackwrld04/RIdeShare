@@ -52,7 +52,7 @@ jobs:
       - name: Install Mobile Dependencies
         working-directory: apps/mobile
         run: |
-          npm install
+          npm install --legacy-peer-deps
 
       - name: Build Optimized Android APK (arm64-v8a only)
         working-directory: apps/mobile/android
