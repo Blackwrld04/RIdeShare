@@ -495,9 +495,30 @@ const environmentSchema = z
 export type AppConfig = z.infer<typeof environmentSchema>;
 
 export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
+  let redisUrl = environment.REDIS_URL?.trim();
+  if (redisUrl) {
+    redisUrl = redisUrl.replace(/^["']|["']$/g, "").trim();
+    // If user pasted the whole redis-cli command from Upstash: e.g. "redis-cli --tls -u redis://..."
+    const match = redisUrl.match(/(rediss?:\/\/[^\s"']+)/);
+    if (match && match[1]) {
+      redisUrl = match[1];
+    }
+  }
+
+  let dbUrl = environment.DATABASE_URL?.trim();
+  if (dbUrl) {
+    dbUrl = dbUrl.replace(/^["']|["']$/g, "").trim();
+    const match = dbUrl.match(/(postgres(?:ql)?:\/\/[^\s"']+)/);
+    if (match && match[1]) {
+      dbUrl = match[1];
+    }
+  }
+
   const normalizedEnvironment = {
     ...environment,
     API_PORT: environment.API_PORT ?? environment.PORT ?? "3000",
+    REDIS_URL: redisUrl ?? environment.REDIS_URL,
+    DATABASE_URL: dbUrl ?? environment.DATABASE_URL,
   };
   const result = environmentSchema.safeParse(normalizedEnvironment);
 
