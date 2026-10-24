@@ -7,7 +7,7 @@ services:
     runtime: node
     plan: starter
     region: oregon
-    buildCommand: npm install --legacy-peer-deps && npm run prisma:generate && npm run build:packages
+    buildCommand: npm install --legacy-peer-deps --include=dev && npm run prisma:generate && npm run build:packages
     preDeployCommand: npm run db:deploy
     startCommand: npx tsx apps/api/src/main.ts
     healthCheckPath: /api/v1/health
