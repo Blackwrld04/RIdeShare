@@ -21,7 +21,7 @@ import type {
 import { Platform } from 'react-native';
 
 export const CUSTOM_API_URL_KEY = '@rideshare_custom_api_url';
-export const DEFAULT_PRODUCTION_API_URL = 'https://rideshare-api.onrender.com/api/v1';
+export const DEFAULT_PRODUCTION_API_URL = 'https://rideshare-l37j.onrender.com/api/v1';
 
 // Dynamically select backend endpoint:
 // 1. Explicit EXPO_PUBLIC_API_URL (from Vercel / GitHub Actions / .env)

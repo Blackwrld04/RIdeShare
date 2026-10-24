@@ -1614,9 +1614,9 @@ export default function AuthScreen() {
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
-                  setInputServerUrl('https://rideshare-api.onrender.com/api/v1');
+                  setInputServerUrl('https://rideshare-l37j.onrender.com/api/v1');
                   handleTestAndSaveServer(
-                    'https://rideshare-api.onrender.com/api/v1',
+                    'https://rideshare-l37j.onrender.com/api/v1',
                   );
                 }}
                 style={{
@@ -1645,7 +1645,7 @@ export default function AuthScreen() {
                     marginTop: 2,
                   }}
                 >
-                  https://rideshare-api.onrender.com/api/v1
+                  https://rideshare-l37j.onrender.com/api/v1
                 </Text>
               </TouchableOpacity>
 
