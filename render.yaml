@@ -53,6 +53,18 @@ services:
         value: sandbox_ninja_public_key
       - key: NINJA_SECRET_KEY
         value: sandbox_ninja_secret_key
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_SECURE
+        value: "true"
+      - key: EMAIL_FROM
+        value: RideShare <noreply@rideshare.app>
       - key: PAYSTACK_SECRET_KEY
         value: sk_test_placeholder_key_for_rideshare
       - key: STORAGE_BUCKET
