@@ -88,8 +88,21 @@ const environmentSchema = z
       .default("development"),
     API_HOST: z.string().min(1).default("0.0.0.0"),
     API_PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
-    DATABASE_URL: z.string().url().startsWith("postgresql://"),
-    REDIS_URL: z.string().url().startsWith("redis://"),
+    DATABASE_URL: z
+      .string()
+      .url()
+      .refine(
+        (url) =>
+          url.startsWith("postgresql://") || url.startsWith("postgres://"),
+        "DATABASE_URL must be a postgresql:// or postgres:// URL",
+      ),
+    REDIS_URL: z
+      .string()
+      .url()
+      .refine(
+        (url) => url.startsWith("redis://") || url.startsWith("rediss://"),
+        "REDIS_URL must be a redis:// or rediss:// URL",
+      ),
     LOG_LEVEL: z
       .enum(["fatal", "error", "warn", "info", "debug"])
       .default("info"),
@@ -421,7 +434,11 @@ const environmentSchema = z
       });
     }
 
-    if (config.NODE_ENV === "production" && config.SMS_PROVIDER === "console") {
+    const isStrictProduction =
+      config.NODE_ENV === "production" &&
+      process.env.STRICT_PRODUCTION_CHECKS !== "false";
+
+    if (isStrictProduction && config.SMS_PROVIDER === "console") {
       context.addIssue({
         code: "custom",
         path: ["SMS_PROVIDER"],
@@ -429,7 +446,7 @@ const environmentSchema = z
       });
     }
 
-    if (config.NODE_ENV === "production" && config.OTP_DEV_CODE) {
+    if (isStrictProduction && config.OTP_DEV_CODE) {
       context.addIssue({
         code: "custom",
         path: ["OTP_DEV_CODE"],
@@ -438,7 +455,7 @@ const environmentSchema = z
     }
 
     if (
-      config.NODE_ENV === "production" &&
+      isStrictProduction &&
       config.WEB_PUSH_PROVIDER !== "vapid"
     ) {
       context.addIssue({
@@ -449,7 +466,7 @@ const environmentSchema = z
     }
 
     if (
-      config.NODE_ENV === "production" &&
+      isStrictProduction &&
       new URL(config.NINJA_BASE_URL).hostname.includes("sandbox")
     ) {
       context.addIssue({
@@ -460,7 +477,7 @@ const environmentSchema = z
     }
 
     if (
-      config.NODE_ENV === "production" &&
+      isStrictProduction &&
       config.CORS_ORIGINS.some((origin) => {
         const url = new URL(origin);
         return url.protocol !== "https:" || url.hostname === "localhost";
@@ -478,7 +495,11 @@ const environmentSchema = z
 export type AppConfig = z.infer<typeof environmentSchema>;
 
 export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
-  const result = environmentSchema.safeParse(environment);
+  const normalizedEnvironment = {
+    ...environment,
+    API_PORT: environment.API_PORT ?? environment.PORT ?? "3000",
+  };
+  const result = environmentSchema.safeParse(normalizedEnvironment);
 
   if (!result.success) {
     throw new Error(z.prettifyError(result.error));

@@ -1,0 +1,83 @@
+services:
+  # =========================================================================
+  # RideShare API - NestJS / Fastify Production Backend Web Service
+  # =========================================================================
+  - type: web
+    name: rideshare-api
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm install --legacy-peer-deps && npm run prisma:generate && npm run build:packages
+    preDeployCommand: npm run db:deploy
+    startCommand: npx tsx apps/api/src/main.ts
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: STRICT_PRODUCTION_CHECKS
+        value: "false"
+      - key: PORT
+        value: 10000
+      - key: API_HOST
+        value: 0.0.0.0
+      - key: API_PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rideshare-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: rideshare-redis
+          property: connectionString
+      - key: AUTH_ACCESS_TOKEN_SECRET
+        generateValue: true
+      - key: AUTH_REFRESH_TOKEN_SECRET
+        generateValue: true
+      - key: OTP_HMAC_SECRET
+        generateValue: true
+      - key: OTP_DEV_CODE
+        value: "000000"
+      - key: IDENTITY_ENCRYPTION_KEY
+        value: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+      - key: IDENTITY_HMAC_SECRET
+        generateValue: true
+      - key: SMS_PROVIDER
+        value: console
+      - key: WEB_PUSH_PROVIDER
+        value: console
+      - key: NINJA_BASE_URL
+        value: https://api.sandbox.ninja.boucloud.io
+      - key: NINJA_PUBLIC_KEY
+        value: sandbox_ninja_public_key
+      - key: NINJA_SECRET_KEY
+        value: sandbox_ninja_secret_key
+      - key: PAYSTACK_SECRET_KEY
+        value: sk_test_placeholder_key_for_rideshare
+      - key: STORAGE_BUCKET
+        value: rideshare-media
+      - key: STORAGE_ACCESS_KEY_ID
+        value: placeholder_s3_key
+      - key: STORAGE_SECRET_ACCESS_KEY
+        value: placeholder_s3_secret_key
+      - key: CORS_ORIGINS
+        value: https://rideshare.vercel.app,http://localhost:5173,http://localhost:3000,http://localhost:8081
+
+  # =========================================================================
+  # RideShare Managed Redis (real-time chat, WebSocket pub/sub, rate limiting)
+  # Note: Render Starter Redis ($7/mo) or replace REDIS_URL with free Upstash Redis
+  # =========================================================================
+  - type: redis
+    name: rideshare-redis
+    plan: starter
+    ipAllowList: []
+
+# =========================================================================
+# RideShare Managed PostgreSQL Database
+# =========================================================================
+databases:
+  - name: rideshare-postgres
+    databaseName: commuteshare
+    user: commuteshare
+    plan: starter

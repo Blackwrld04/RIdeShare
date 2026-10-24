@@ -20,13 +20,51 @@ import type {
 } from '../types';
 import { Platform } from 'react-native';
 
-// Dynamically select backend endpoint: localhost for Web/iOS, 10.0.2.2 for Android emulator
-export const API_BASE_URL =
-  Platform.OS === 'web'
-    ? 'http://localhost:3000/api/v1'
-    : Platform.OS === 'android'
-      ? 'http://10.0.2.2:3000/api/v1'
-      : 'http://localhost:3000/api/v1';
+export const CUSTOM_API_URL_KEY = '@rideshare_custom_api_url';
+export const DEFAULT_PRODUCTION_API_URL = 'https://rideshare-api.onrender.com/api/v1';
+
+// Dynamically select backend endpoint:
+// 1. Explicit EXPO_PUBLIC_API_URL (from Vercel / GitHub Actions / .env)
+// 2. Localhost for Web/iOS, 10.0.2.2 for Android emulator in dev mode
+// 3. Live Render production backend for real device APKs & web production
+export const getDefaultApiBaseUrl = (): string => {
+  if (process.env.EXPO_PUBLIC_API_URL && process.env.EXPO_PUBLIC_API_URL.trim()) {
+    return process.env.EXPO_PUBLIC_API_URL.trim().replace(/\/+$/, '');
+  }
+
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    if (Platform.OS === 'android') {
+      return 'http://10.0.2.2:3000/api/v1';
+    }
+    return 'http://localhost:3000/api/v1';
+  }
+
+  return DEFAULT_PRODUCTION_API_URL;
+};
+
+export const API_BASE_URL = getDefaultApiBaseUrl();
+
+export const getActiveApiUrl = async (): Promise<string> => {
+  try {
+    const custom = await AsyncStorage.getItem(CUSTOM_API_URL_KEY);
+    if (custom && custom.trim()) {
+      return custom.trim().replace(/\/+$/, '');
+    }
+  } catch {}
+  return API_BASE_URL;
+};
+
+export const setCustomApiUrl = async (url: string): Promise<void> => {
+  await AsyncStorage.setItem(CUSTOM_API_URL_KEY, url.trim().replace(/\/+$/, ''));
+};
+
+export const getCustomApiUrl = async (): Promise<string | null> => {
+  return AsyncStorage.getItem(CUSTOM_API_URL_KEY);
+};
+
+export const resetCustomApiUrl = async (): Promise<void> => {
+  await AsyncStorage.removeItem(CUSTOM_API_URL_KEY);
+};
 
 const ACCESS_TOKEN_KEY = '@rideshare_access_token';
 const REFRESH_TOKEN_KEY = '@rideshare_refresh_token';
@@ -39,8 +77,11 @@ export const apiClient = axios.create({
   },
 });
 
-// Attach JWT access token to every outgoing request
+// Attach active base URL and JWT access token to every outgoing request
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+  const activeBaseUrl = await getActiveApiUrl();
+  config.baseURL = activeBaseUrl;
+
   const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -103,7 +144,8 @@ apiClient.interceptors.response.use(
       }
 
       try {
-        const refreshRes = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
+        const activeUrl = await getActiveApiUrl();
+        const refreshRes = await axios.post(`${activeUrl}/auth/refresh`, { refreshToken });
         const { accessToken, refreshToken: newRefreshToken } = refreshRes.data;
 
         await AsyncStorage.setItem(ACCESS_TOKEN_KEY, accessToken);

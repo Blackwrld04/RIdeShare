@@ -66,6 +66,8 @@ jobs:
 
       - name: Export Web Frontend Bundle
         working-directory: apps/mobile
+        env:
+          EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL || 'https://rideshare-api.onrender.com/api/v1' }}
         run: |
           npm run build:web
 

@@ -58,6 +58,8 @@ describe("loadConfig", () => {
       IDENTITY_HMAC_SECRET: requiredEnvironment.IDENTITY_HMAC_SECRET,
       SMS_PROVIDER: "console",
       SMS_FALLBACK_PROVIDER: "none",
+      SMTP_PORT: 465,
+      SMTP_SECURE: true,
       TERMII_BASE_URL: "https://api.ng.termii.com",
       TERMII_SENDER_ID: "CommuteNG",
       AFRICASTALKING_BASE_URL: "https://api.africastalking.com",
