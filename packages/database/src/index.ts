@@ -37,12 +37,24 @@ export interface Database {
 }
 
 export function createDatabase(connectionString: string): Database {
+  let isLocal = false;
+  try {
+    const url = new URL(connectionString);
+    isLocal =
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      !url.hostname.includes(".");
+  } catch {
+    isLocal = false;
+  }
+
   const pool = new Pool({
     connectionString,
-    connectionTimeoutMillis: 2_000,
-    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30_000,
     max: 10,
-    query_timeout: 2_000,
+    query_timeout: 10_000,
+    ssl: isLocal ? undefined : { rejectUnauthorized: false },
   });
   const adapter = new PrismaPg(pool);
   const client = new PrismaClient({ adapter });
