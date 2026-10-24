@@ -1,0 +1,89 @@
+name: Build React Native Android APK
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/build-react-native-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-rn-android:
+    runs-on: ubuntu-latest
+    name: Build Optimized React Native APK (~20MB)
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'apps/mobile/package-lock.json'
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK & Platform Tools
+        run: |
+          echo "y" | sdkmanager --install "ndk;27.1.12297006" "platforms;android-36" "build-tools;36.0.0"
+          NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -name "27.*" | head -n 1)
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+          echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+
+      - name: Install Mobile Dependencies
+        working-directory: apps/mobile
+        run: |
+          npm install
+
+      - name: Build Optimized Android APK (arm64-v8a only)
+        working-directory: apps/mobile/android
+        run: |
+          ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Prepare APK
+        run: |
+          mkdir -p dist-rn-apk
+          APK_PATH=$(find apps/mobile/android/app/build/outputs/apk/ -name "*.apk" | head -n 1)
+          echo "Found APK at: $APK_PATH"
+          cp "$APK_PATH" dist-rn-apk/RideShare-ReactNative-v1.0.0.apk
+          ls -lh dist-rn-apk/RideShare-ReactNative-v1.0.0.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RideShare-ReactNative-v1.0.0-APK
+          path: dist-rn-apk/RideShare-ReactNative-v1.0.0.apk
+          retention-days: 14
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rn-v1.0.0
+          name: "RideShare React Native v1.0.0"
+          body: |
+            ### 🚗 RideShare Mobile (Optimized React Native Build)
+            
+            - **Platform**: Android (`arm64-v8a`)
+            - **Optimized Size**: ~25 MB (single architecture for modern Android phones)
+            - **Engine**: Hermes JS Engine + React Native New Architecture
+            
+            #### How to Install:
+            1. Download `RideShare-ReactNative-v1.0.0.apk` directly to your phone.
+            2. Tap **Install**.
+          files: dist-rn-apk/RideShare-ReactNative-v1.0.0.apk
+          draft: false
+          prerelease: false

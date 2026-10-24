@@ -1,0 +1,115 @@
+name: Build Tauri Android APK
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/build-tauri-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-tauri-android:
+    runs-on: ubuntu-latest
+    name: Build Tauri Android APK
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'apps/mobile/package-lock.json'
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK & Platform Tools
+        run: |
+          echo "y" | sdkmanager --install "ndk;27.1.12297006" "platforms;android-34" "build-tools;34.0.0"
+          NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -name "27.*" | head -n 1)
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+          echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/mobile/src-tauri
+
+      - name: Install Mobile Dependencies
+        working-directory: apps/mobile
+        run: |
+          npm install
+
+      - name: Export Web Frontend Bundle
+        working-directory: apps/mobile
+        run: |
+          npm run build:web
+
+      - name: Initialize Tauri Android Target
+        working-directory: apps/mobile
+        run: |
+          npx @tauri-apps/cli android init --ci
+
+      - name: Build Tauri Android APK (arm64-v8a)
+        working-directory: apps/mobile
+        run: |
+          npx @tauri-apps/cli android build --ci --apk --target aarch64 --debug
+
+      - name: Locate and Prepare APK
+        id: prepare-apk
+        run: |
+          mkdir -p dist-apk
+          APK_PATH=$(find apps/mobile/src-tauri/gen/android/ -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Searching for any generated apk..."
+            APK_PATH=$(find . -name "*.apk" | head -n 1)
+          fi
+          echo "Found APK at: $APK_PATH"
+          cp "$APK_PATH" dist-apk/RideShare-Tauri-v1.0.0.apk
+          ls -lh dist-apk/RideShare-Tauri-v1.0.0.apk
+          echo "apk_path=dist-apk/RideShare-Tauri-v1.0.0.apk" >> $GITHUB_OUTPUT
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RideShare-Tauri-v1.0.0-APK
+          path: dist-apk/RideShare-Tauri-v1.0.0.apk
+          retention-days: 14
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: tauri-v1.0.0
+          name: "RideShare Tauri Mobile v1.0.0"
+          body: |
+            ### 🚗 RideShare Mobile (Tauri Android APK)
+            
+            - **Platform**: Android (`arm64-v8a`)
+            - **Engine**: Tauri v2 Mobile + WebKit WebView
+            - **Features**: Real-time RideShare UI, Booking, Driver Matching, Chat, Profile & Settings
+            
+            #### How to Install:
+            1. Download `RideShare-Tauri-v1.0.0.apk` directly to your Android device.
+            2. Open the downloaded file and tap **Install** (allow install from this source if prompted).
+          files: dist-apk/RideShare-Tauri-v1.0.0.apk
+          draft: false
+          prerelease: false
