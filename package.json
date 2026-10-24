@@ -20,7 +20,7 @@
     "admin:promote": "npm run build:packages && npm run admin:promote --workspace @commuteshare/api",
     "build": "npm run build:packages && npm run build --workspace @commuteshare/api && npm run build --workspace @commuteshare/worker",
     "build:packages": "npm run build --workspace @commuteshare/config && npm run build --workspace @commuteshare/database",
-    "build:web": "npm run build:web --prefix apps/mobile",
+    "build:web": "npm install --prefix apps/mobile --legacy-peer-deps && npm run build:web --prefix apps/mobile",
     "start:api": "npx tsx apps/api/src/main.ts",
     "db:deploy": "npm run db:deploy --workspace @commuteshare/database",
     "db:migrate": "npm run db:migrate --workspace @commuteshare/database",
