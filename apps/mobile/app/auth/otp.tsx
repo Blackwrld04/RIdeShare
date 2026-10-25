@@ -26,22 +26,12 @@ import {
   RefreshCw,
   Sparkles,
   Check,
-  Globe,
-  Server,
-  X,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../store/useAppStore';
 import { Button } from '../../components/ui/Button';
 import { Logo } from '../../components/ui/Logo';
-import {
-  api,
-  getActiveApiUrl,
-  setCustomApiUrl,
-  resetCustomApiUrl,
-  API_BASE_URL,
-  DEFAULT_PRODUCTION_API_URL,
-} from '../../services/api';
+import { api } from '../../services/api';
 
 type AuthMode = 'login' | 'signup' | 'otp_fallback';
 type SignUpSubStep = 'email' | 'code' | 'password';
@@ -126,97 +116,23 @@ export default function AuthScreen() {
     return () => clearInterval(interval);
   }, [mode, fallbackStep, fallbackTimer]);
 
-  // Server Settings Modal State
-  const [showServerModal, setShowServerModal] = useState(false);
-  const [currentServerUrl, setCurrentServerUrl] = useState(API_BASE_URL);
-  const [inputServerUrl, setInputServerUrl] = useState(API_BASE_URL);
-  const [testingConnection, setTestingConnection] = useState(false);
-  const [connectionTestResult, setConnectionTestResult] = useState<{
-    ok: boolean;
-    message: string;
-  } | null>(null);
-
-  useEffect(() => {
-    getActiveApiUrl().then((url) => {
-      setCurrentServerUrl(url);
-      setInputServerUrl(url);
-    });
-  }, []);
-
-  const handleAuthError = async (
+  const handleAuthError = (
     err: any,
     fallbackTitle = 'Authentication Notice',
   ) => {
     const isNetworkErr = err?.message === 'Network Error' || !err?.response;
-    const activeUrl = await getActiveApiUrl();
     const msg = isNetworkErr
-      ? `Network Error: Unable to reach backend at ${activeUrl}. Please ensure your backend is running or tap "Server Settings" to update the backend URL.`
+      ? 'Unable to connect to the server. Please check your internet connection and try again.'
       : err?.response?.data?.message ||
         err?.message ||
         'Request failed. Please try again.';
 
     setErrorMessage(msg);
     Alert.alert(
-      isNetworkErr ? 'Server Connection Error' : fallbackTitle,
+      isNetworkErr ? 'Connection Notice' : fallbackTitle,
       msg,
-      isNetworkErr
-        ? [
-            { text: 'Server Settings', onPress: () => setShowServerModal(true) },
-            { text: 'OK', style: 'cancel' },
-          ]
-        : [{ text: 'OK' }],
+      [{ text: 'OK' }],
     );
-  };
-
-  const handleTestAndSaveServer = async (presetUrl?: string) => {
-    const target = (presetUrl || inputServerUrl).trim().replace(/\/+$/, '');
-    if (!target) return;
-
-    setTestingConnection(true);
-    setConnectionTestResult(null);
-
-    try {
-      const response = await fetch(`${target}/health`, { method: 'GET' });
-      await setCustomApiUrl(target);
-      setCurrentServerUrl(target);
-      setInputServerUrl(target);
-
-      if (response.ok) {
-        setConnectionTestResult({
-          ok: true,
-          message: `Connected successfully! (HTTP ${response.status} OK)`,
-        });
-        try {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch {}
-      } else {
-        setConnectionTestResult({
-          ok: false,
-          message: `Server replied with HTTP ${response.status}. URL saved.`,
-        });
-      }
-    } catch (err: any) {
-      await setCustomApiUrl(target);
-      setCurrentServerUrl(target);
-      setInputServerUrl(target);
-      setConnectionTestResult({
-        ok: false,
-        message: `Cannot reach ${target} (${err?.message || 'Network error'}). URL was saved.`,
-      });
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      } catch {}
-    } finally {
-      setTestingConnection(false);
-    }
-  };
-
-  const handleResetServer = async () => {
-    await resetCustomApiUrl();
-    const active = await getActiveApiUrl();
-    setCurrentServerUrl(active);
-    setInputServerUrl(active);
-    setConnectionTestResult({ ok: true, message: 'Reset to default endpoint.' });
   };
 
   // ====================================================
@@ -563,21 +479,8 @@ export default function AuthScreen() {
             </Text>
           </View>
 
-          {/* Server Config Button */}
-          <TouchableOpacity
-            onPress={() => setShowServerModal(true)}
-            activeOpacity={0.7}
-            style={[
-              styles.backButton,
-              {
-                backgroundColor: isLight ? '#FFFFFF' : '#14161C',
-                borderColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.08)',
-              },
-            ]}
-            accessibilityLabel="Server Settings"
-          >
-            <Globe size={18} color="#E06B26" />
-          </TouchableOpacity>
+          {/* Right header spacer to keep title centered */}
+          <View style={{ width: 40 }} />
         </View>
 
         {/* Brand Icon & Welcome Title */}
@@ -1512,336 +1415,7 @@ export default function AuthScreen() {
         )}
       </ScrollView>
 
-      {/* ---------------- SERVER SETTINGS MODAL ---------------- */}
-      <Modal
-        visible={showServerModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowServerModal(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: 20,
-          }}
-        >
-          <View
-            style={{
-              width: '100%',
-              maxWidth: 440,
-              backgroundColor: isLight ? '#FFFFFF' : '#14161C',
-              borderRadius: 20,
-              padding: 24,
-              borderWidth: 1,
-              borderColor: isLight ? '#E2E8F0' : 'rgba(255,255,255,0.1)',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.3,
-              shadowRadius: 20,
-              elevation: 10,
-              gap: 16,
-            }}
-          >
-            {/* Modal Header */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <View
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
-              >
-                <View
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: 'rgba(224, 107, 38, 0.15)',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Server size={20} color="#E06B26" />
-                </View>
-                <View>
-                  <Text
-                    style={{
-                      fontSize: 17,
-                      fontWeight: '800',
-                      color: isLight ? '#0F172A' : '#FFFFFF',
-                    }}
-                  >
-                    Server Endpoint
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: isLight ? '#64748B' : '#94A3B8',
-                    }}
-                  >
-                    Select or enter backend API URL
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={() => setShowServerModal(false)}
-                style={{ padding: 6 }}
-              >
-                <X size={20} color={isLight ? '#64748B' : '#94A3B8'} />
-              </TouchableOpacity>
-            </View>
 
-            {/* Presets */}
-            <View style={{ gap: 8 }}>
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: '700',
-                  color: isLight ? '#64748B' : '#94A3B8',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                }}
-              >
-                Quick Presets
-              </Text>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  setInputServerUrl('https://rideshare-l37j.onrender.com/api/v1');
-                  handleTestAndSaveServer(
-                    'https://rideshare-l37j.onrender.com/api/v1',
-                  );
-                }}
-                style={{
-                  padding: 12,
-                  borderRadius: 12,
-                  backgroundColor: isLight ? '#F1F5F9' : '#1E222D',
-                  borderWidth: 1,
-                  borderColor: inputServerUrl.includes('onrender.com')
-                    ? '#E06B26'
-                    : 'transparent',
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: '700',
-                    color: isLight ? '#0F172A' : '#FFFFFF',
-                  }}
-                >
-                  ☁️ Render Cloud (Live Production)
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    color: isLight ? '#64748B' : '#94A3B8',
-                    marginTop: 2,
-                  }}
-                >
-                  https://rideshare-l37j.onrender.com/api/v1
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  setInputServerUrl('http://10.0.2.2:3000/api/v1');
-                  handleTestAndSaveServer('http://10.0.2.2:3000/api/v1');
-                }}
-                style={{
-                  padding: 12,
-                  borderRadius: 12,
-                  backgroundColor: isLight ? '#F1F5F9' : '#1E222D',
-                  borderWidth: 1,
-                  borderColor: inputServerUrl.includes('10.0.2.2')
-                    ? '#E06B26'
-                    : 'transparent',
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: '700',
-                    color: isLight ? '#0F172A' : '#FFFFFF',
-                  }}
-                >
-                  📱 Android Studio Emulator Loopback
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    color: isLight ? '#64748B' : '#94A3B8',
-                    marginTop: 2,
-                  }}
-                >
-                  http://10.0.2.2:3000/api/v1
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  setInputServerUrl('http://localhost:3000/api/v1');
-                  handleTestAndSaveServer('http://localhost:3000/api/v1');
-                }}
-                style={{
-                  padding: 12,
-                  borderRadius: 12,
-                  backgroundColor: isLight ? '#F1F5F9' : '#1E222D',
-                  borderWidth: 1,
-                  borderColor: inputServerUrl.includes('localhost')
-                    ? '#E06B26'
-                    : 'transparent',
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: '700',
-                    color: isLight ? '#0F172A' : '#FFFFFF',
-                  }}
-                >
-                  💻 Localhost (Web / iOS / Same Machine)
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    color: isLight ? '#64748B' : '#94A3B8',
-                    marginTop: 2,
-                  }}
-                >
-                  http://localhost:3000/api/v1
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Custom URL Input */}
-            <View style={{ gap: 6 }}>
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: '700',
-                  color: isLight ? '#64748B' : '#94A3B8',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                }}
-              >
-                Custom Endpoint URL
-              </Text>
-              <TextInput
-                value={inputServerUrl}
-                onChangeText={(text) => {
-                  setInputServerUrl(text);
-                  setConnectionTestResult(null);
-                }}
-                placeholder="https://your-custom-api.onrender.com/api/v1"
-                placeholderTextColor={isLight ? '#94A3B8' : '#64748B'}
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={{
-                  padding: 12,
-                  borderRadius: 12,
-                  backgroundColor: isLight ? '#F8FAFC' : '#0A0B0E',
-                  borderWidth: 1,
-                  borderColor: isLight ? '#CBD5E1' : 'rgba(255,255,255,0.15)',
-                  color: isLight ? '#0F172A' : '#FFFFFF',
-                  fontSize: 13,
-                  fontWeight: '500',
-                }}
-              />
-            </View>
-
-            {/* Test connection indicator */}
-            {connectionTestResult && (
-              <View
-                style={{
-                  padding: 10,
-                  borderRadius: 10,
-                  backgroundColor: connectionTestResult.ok
-                    ? 'rgba(16, 185, 129, 0.12)'
-                    : 'rgba(239, 68, 68, 0.12)',
-                  borderWidth: 1,
-                  borderColor: connectionTestResult.ok ? '#10B981' : '#EF4444',
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '700',
-                    color: connectionTestResult.ok ? '#10B981' : '#EF4444',
-                  }}
-                >
-                  {connectionTestResult.message}
-                </Text>
-              </View>
-            )}
-
-            {/* Action buttons */}
-            <View style={{ gap: 8, marginTop: 4 }}>
-              <Button
-                title={
-                  testingConnection ? 'Testing Connection...' : 'Save & Connect'
-                }
-                onPress={() => handleTestAndSaveServer()}
-                loading={testingConnection}
-                variant="primary"
-                size="md"
-              />
-
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <TouchableOpacity
-                  onPress={handleResetServer}
-                  style={{
-                    flex: 1,
-                    padding: 12,
-                    borderRadius: 12,
-                    alignItems: 'center',
-                    backgroundColor: isLight ? '#F1F5F9' : '#1E222D',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: '700',
-                      color: isLight ? '#64748B' : '#94A3B8',
-                    }}
-                  >
-                    Reset Default
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setShowServerModal(false)}
-                  style={{
-                    flex: 1,
-                    padding: 12,
-                    borderRadius: 12,
-                    alignItems: 'center',
-                    backgroundColor: isLight ? '#E2E8F0' : '#2D3748',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: '700',
-                      color: isLight ? '#0F172A' : '#FFFFFF',
-                    }}
-                  >
-                    Done
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }

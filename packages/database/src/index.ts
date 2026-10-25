@@ -38,12 +38,14 @@ export interface Database {
 
 export function createDatabase(connectionString: string): Database {
   let isLocal = false;
+  let schema: string | undefined = undefined;
   try {
     const url = new URL(connectionString);
     isLocal =
       url.hostname === "localhost" ||
       url.hostname === "127.0.0.1" ||
       !url.hostname.includes(".");
+    schema = url.searchParams.get("schema") || undefined;
   } catch {
     isLocal = false;
   }
@@ -56,7 +58,7 @@ export function createDatabase(connectionString: string): Database {
     query_timeout: 10_000,
     ssl: isLocal ? undefined : { rejectUnauthorized: false },
   });
-  const adapter = new PrismaPg(pool);
+  const adapter = new PrismaPg(pool, schema ? { schema } : undefined);
   const client = new PrismaClient({ adapter });
 
   return {

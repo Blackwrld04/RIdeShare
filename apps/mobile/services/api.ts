@@ -29,7 +29,11 @@ export const DEFAULT_PRODUCTION_API_URL = 'https://rideshare-l37j.onrender.com/a
 // 3. Live Render production backend for real device APKs & web production
 export const getDefaultApiBaseUrl = (): string => {
   if (process.env.EXPO_PUBLIC_API_URL && process.env.EXPO_PUBLIC_API_URL.trim()) {
-    return process.env.EXPO_PUBLIC_API_URL.trim().replace(/\/+$/, '');
+    let url = process.env.EXPO_PUBLIC_API_URL.trim().replace(/\/+$/, '');
+    if (!url.endsWith('/api/v1')) {
+      url = `${url}/api/v1`;
+    }
+    return url;
   }
 
   if (typeof __DEV__ !== 'undefined' && __DEV__) {
@@ -44,13 +48,8 @@ export const getDefaultApiBaseUrl = (): string => {
 
 export const API_BASE_URL = getDefaultApiBaseUrl();
 
+// Production URL is embedded directly into the application
 export const getActiveApiUrl = async (): Promise<string> => {
-  try {
-    const custom = await AsyncStorage.getItem(CUSTOM_API_URL_KEY);
-    if (custom && custom.trim()) {
-      return custom.trim().replace(/\/+$/, '');
-    }
-  } catch {}
   return API_BASE_URL;
 };
 
@@ -59,7 +58,7 @@ export const setCustomApiUrl = async (url: string): Promise<void> => {
 };
 
 export const getCustomApiUrl = async (): Promise<string | null> => {
-  return AsyncStorage.getItem(CUSTOM_API_URL_KEY);
+  return API_BASE_URL;
 };
 
 export const resetCustomApiUrl = async (): Promise<void> => {
