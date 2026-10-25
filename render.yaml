@@ -74,7 +74,7 @@ services:
       - key: STORAGE_SECRET_ACCESS_KEY
         value: placeholder_s3_secret_key
       - key: CORS_ORIGINS
-        value: https://rideshare.vercel.app,http://localhost:5173,http://localhost:3000,http://localhost:8081
+        value: https://rideshare-black.vercel.app,https://rideshare.vercel.app,http://localhost:5173,http://localhost:3000,http://localhost:8081
 
   # =========================================================================
   # RideShare Managed Redis (real-time chat, WebSocket pub/sub, rate limiting)

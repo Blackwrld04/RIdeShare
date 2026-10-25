@@ -82,7 +82,7 @@ Render's free tier includes free Web Services and free PostgreSQL, but managed R
    - `STORAGE_BUCKET`: `rideshare-media`
    - `STORAGE_ACCESS_KEY_ID`: `placeholder_key`
    - `STORAGE_SECRET_ACCESS_KEY`: `placeholder_secret`
-   - `CORS_ORIGINS`: `https://rideshare.vercel.app,http://localhost:5173,http://localhost:3000,http://localhost:8081`
+   - `CORS_ORIGINS`: `https://rideshare-black.vercel.app,https://rideshare.vercel.app,http://localhost:5173,http://localhost:3000,http://localhost:8081`
 
 ---
 
@@ -90,22 +90,20 @@ Render's free tier includes free Web Services and free PostgreSQL, but managed R
 
 The frontend is exported from Expo as a high-performance Single Page Application (`apps/mobile/dist`). Configuration is pre-set in [`vercel.json`](./vercel.json).
 
-### Steps:
-1. Log into your [Vercel Dashboard](https://vercel.com).
-2. Click **Add New...** -> **Project**.
-3. Import your GitHub repository: `Blackwrld04/RIdeShare`.
-4. Configure Project Settings:
-   - **Framework Preset**: `Other`
-   - **Root Directory**: `.` (leave as repository root)
-   - **Build Command**: `npm run build:web --prefix apps/mobile`
-   - **Output Directory**: `apps/mobile/dist`
-5. Add Environment Variable:
-   - **Key**: `EXPO_PUBLIC_API_URL`
-   - **Value**: `https://your-rideshare-api.onrender.com/api/v1` *(Replace with your Render API URL)*
-6. Click **Deploy**.
-7. In ~60 seconds, Vercel will assign a production domain (e.g., `https://rideshare-xxx.vercel.app`).
+### Live Production Web URL:
+👉 **`https://rideshare-black.vercel.app`**
 
-> **Tip**: After Vercel gives you your URL, update `CORS_ORIGINS` in your Render Environment Variables to include your Vercel URL!
+### Live Production Backend API URL:
+👉 **`https://rideshare-l37j.onrender.com/api/v1`**
+
+### Live Production Android APK (Direct Download):
+👉 **`https://github.com/Blackwrld04/RIdeShare/releases/download/rn-v1.0.0/RideShare-ReactNative-v1.0.0.apk`**
+
+### Continuous Updates Workflow:
+- **Web App Updates**: Every `git push origin main` triggers an automatic build & deployment on Vercel (~60 seconds).
+- **Backend Updates**: Every `git push origin main` triggers an automatic build & redeployment on Render (~2 minutes).
+- **Mobile APK Updates**: Triggered by pushing a git tag or dispatching the `build-react-native-android.yml` workflow on GitHub Actions.
+- **In-App Live Switching**: Physical phone users can also tap the 🌐 globe icon in the app header to switch backend endpoints anytime without reinstalling.
 
 ---
 
