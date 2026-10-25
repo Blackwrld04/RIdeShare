@@ -27,7 +27,6 @@ import type {
   VerifyOtpInput,
 } from "./auth.schemas.js";
 import {
-  createOtp,
   digestSecret,
   hashPassword,
   secretsMatch,
@@ -176,9 +175,7 @@ export class AuthService {
     }
 
     const challengeId = randomUUID();
-    const code = isEmail
-      ? randomInt(100_000, 999_999).toString()
-      : createOtp(this.config.OTP_DEV_CODE);
+    const code = randomInt(100_000, 999_999).toString();
 
     const expiresAt = new Date(
       now.getTime() + this.config.OTP_TTL_SECONDS * 1_000,
@@ -229,13 +226,11 @@ export class AuthService {
       });
     } catch (deliveryError) {
       console.error("[AuthService] OTP delivery error:", deliveryError);
-      if (!this.config.OTP_DEV_CODE) {
-        await this.database.client.phoneOtpChallenge.updateMany({
-          where: { id: challengeId, consumedAt: null },
-          data: { consumedAt: new Date() },
-        });
-        throw new ServiceUnavailableException("Unable to send verification code");
-      }
+      await this.database.client.phoneOtpChallenge.updateMany({
+        where: { id: challengeId, consumedAt: null },
+        data: { consumedAt: new Date() },
+      });
+      throw new ServiceUnavailableException("Unable to send verification code");
     }
 
     return {
@@ -265,11 +260,7 @@ export class AuthService {
       `${challenge.id}:${input.code}`,
     );
 
-    const isDevBypass =
-      Boolean(this.config.OTP_DEV_CODE) &&
-      input.code === this.config.OTP_DEV_CODE;
-
-    if (!secretsMatch(challenge.codeDigest, suppliedDigest) && !isDevBypass) {
+    if (!secretsMatch(challenge.codeDigest, suppliedDigest)) {
       const isFinalAttempt = challenge.attempts + 1 >= challenge.maxAttempts;
       await this.database.client.phoneOtpChallenge.updateMany({
         where: { id: challenge.id, consumedAt: null },
@@ -779,13 +770,11 @@ export class AuthService {
       });
     } catch (deliveryError) {
       console.error("[AuthService] Registration OTP delivery error:", deliveryError);
-      if (!this.config.OTP_DEV_CODE) {
-        await this.database.client.phoneOtpChallenge.updateMany({
-          where: { id: challengeId, consumedAt: null },
-          data: { consumedAt: new Date() },
-        });
-        throw new ServiceUnavailableException("Unable to send verification code email");
-      }
+      await this.database.client.phoneOtpChallenge.updateMany({
+        where: { id: challengeId, consumedAt: null },
+        data: { consumedAt: new Date() },
+      });
+      throw new ServiceUnavailableException("Unable to send verification code email");
     }
 
     return {
@@ -817,11 +806,7 @@ export class AuthService {
       `${challenge.id}:${input.code}`,
     );
 
-    const isDevBypass =
-      Boolean(this.config.OTP_DEV_CODE) &&
-      input.code === this.config.OTP_DEV_CODE;
-
-    if (!secretsMatch(challenge.codeDigest, suppliedDigest) && !isDevBypass) {
+    if (!secretsMatch(challenge.codeDigest, suppliedDigest)) {
       const isFinalAttempt = challenge.attempts + 1 >= challenge.maxAttempts;
       await this.database.client.phoneOtpChallenge.updateMany({
         where: { id: challenge.id, consumedAt: null },
