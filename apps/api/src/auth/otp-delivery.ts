@@ -131,9 +131,9 @@ export class GmailSmtpOtpDelivery extends OtpDelivery {
         user: this.config.SMTP_USER,
         pass: this.config.SMTP_PASS?.replace(/\s+/g, ""),
       },
-      connectionTimeout: 4000,
-      greetingTimeout: 4000,
-      socketTimeout: 5000,
+      connectionTimeout: 2000,
+      greetingTimeout: 2000,
+      socketTimeout: 2500,
     });
   }
 
@@ -215,7 +215,7 @@ export class GmailSmtpOtpDelivery extends OtpDelivery {
         html: htmlContent,
       }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("SMTP sendMail timed out after 5s")), 5000),
+        setTimeout(() => reject(new Error("SMTP sendMail timed out after 2.5s")), 2500),
       ),
     ]);
 

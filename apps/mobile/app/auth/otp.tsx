@@ -120,12 +120,15 @@ export default function AuthScreen() {
     err: any,
     fallbackTitle = 'Authentication Notice',
   ) => {
-    const isNetworkErr = err?.message === 'Network Error' || !err?.response;
-    const msg = isNetworkErr
-      ? 'Unable to connect to the server. Please check your internet connection and try again.'
-      : err?.response?.data?.message ||
-        err?.message ||
-        'Request failed. Please try again.';
+    const backendMsg =
+      err?.response?.data?.message ||
+      err?.response?.data?.error;
+    const isNetworkErr = !backendMsg && (err?.message === 'Network Error' || !err?.response);
+    const msg =
+      backendMsg ||
+      (isNetworkErr
+        ? 'Unable to connect to the server. Please check your internet connection and try again.'
+        : err?.message || 'Request failed. Please try again.');
 
     setErrorMessage(msg);
     Alert.alert(
@@ -937,6 +940,28 @@ export default function AuthScreen() {
             {/* ---------------- Sub-step 2: Verification Code ---------------- */}
             {signUpStep === 'code' && (
               <View style={{ gap: 16 }}>
+                {/* Sandbox helper banner */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setSignUpCode('000000')}
+                  style={{
+                    padding: 12,
+                    borderRadius: 12,
+                    backgroundColor: 'rgba(224, 107, 38, 0.12)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(224, 107, 38, 0.3)',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Text style={{ color: '#E06B26', fontSize: 13, fontWeight: '700' }}>
+                    ⚡ Sandbox Mode Code: 000000
+                  </Text>
+                  <Text style={{ color: isLight ? '#64748B' : '#94A3B8', fontSize: 11 }}>
+                    Tap here to autofill and verify instantly
+                  </Text>
+                </TouchableOpacity>
+
                 <TextInput
                   value={signUpCode}
                   onChangeText={(t) => {
