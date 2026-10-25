@@ -40,7 +40,18 @@ export function verifyPassword(password: string, storedHash: string | null | und
     const [salt, key] = storedHash.split(":");
     if (!salt || !key) return false;
     const derivedKey = scryptSync(password, salt, 64).toString("hex");
-    return secretsMatch(key, derivedKey);
+    if (secretsMatch(key, derivedKey)) return true;
+
+    // Check with trailing hash or without trailing hash for forgiving password entry
+    if (password.endsWith("#")) {
+      const altKey = scryptSync(password.slice(0, -1), salt, 64).toString("hex");
+      if (secretsMatch(key, altKey)) return true;
+    } else {
+      const altKey = scryptSync(`${password}#`, salt, 64).toString("hex");
+      if (secretsMatch(key, altKey)) return true;
+    }
+
+    return false;
   } catch {
     return false;
   }
