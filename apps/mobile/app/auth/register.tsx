@@ -109,10 +109,9 @@ export default function RegisterScreen() {
       const fullPhone = `+234${phoneNumber.replace(/^0+/, '')}`;
       let token = await api.auth.getToken();
       if (!token) {
-        // Auto-initialize challenge for registration
-        const req = await api.auth.requestOtp(fullPhone);
-        const otpResp = await api.auth.verifyOtp(req.challengeId, '000000');
-        token = otpResp.accessToken;
+        Alert.alert('Authentication Required', 'Please verify your account to complete registration.');
+        router.replace('/auth/otp');
+        return;
       }
 
       // 2. Persist user profile to backend

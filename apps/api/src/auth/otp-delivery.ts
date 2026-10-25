@@ -131,9 +131,9 @@ export class GmailSmtpOtpDelivery extends OtpDelivery {
         user: this.config.SMTP_USER,
         pass: this.config.SMTP_PASS?.replace(/\s+/g, ""),
       },
-      connectionTimeout: 2000,
-      greetingTimeout: 2000,
-      socketTimeout: 2500,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
   }
 
@@ -206,18 +206,13 @@ export class GmailSmtpOtpDelivery extends OtpDelivery {
       </html>
     `;
 
-    const info = await Promise.race([
-      this.transporter.sendMail({
-        from: fromAddress,
-        to: recipient,
-        subject: `Your RideShare Code: ${message.code}`,
-        text: `Your RideShare verification code is: ${message.code}. It expires in ${minutes} minutes.`,
-        html: htmlContent,
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("SMTP sendMail timed out after 2.5s")), 2500),
-      ),
-    ]);
+    const info = await this.transporter.sendMail({
+      from: fromAddress,
+      to: recipient,
+      subject: `Your RideShare Code: ${message.code}`,
+      text: `Your RideShare verification code is: ${message.code}. It expires in ${minutes} minutes.`,
+      html: htmlContent,
+    });
 
     console.log(`[GmailSmtpOtpDelivery] Verification code ${message.code} sent to ${recipient} (id: ${info.messageId})`);
     return `smtp:${info.messageId}`;
@@ -260,21 +255,7 @@ export class HybridOtpDelivery extends OtpDelivery {
   async send(message: OtpMessage): Promise<string> {
     // If an email address is provided and SMTP is configured, send directly to the user's email
     if (message.email && this.emailDelivery) {
-      try {
-        return await this.emailDelivery.send(message);
-      } catch (emailErr) {
-        console.warn(
-          `[HybridOtpDelivery] Email delivery to ${message.email} failed:`,
-          emailErr,
-        );
-        if (this.config.OTP_DEV_CODE) {
-          console.log(
-            `[HybridOtpDelivery] DEV CODE active: ${this.config.OTP_DEV_CODE} for ${message.email}`,
-          );
-          return `dev:${this.config.OTP_DEV_CODE}`;
-        }
-        throw emailErr;
-      }
+      return await this.emailDelivery.send(message);
     }
 
     // Otherwise, send via SMS to user's phone number. Never fall back to sending user OTPs to SMTP_USER.

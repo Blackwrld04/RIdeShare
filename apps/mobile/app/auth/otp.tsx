@@ -940,27 +940,38 @@ export default function AuthScreen() {
             {/* ---------------- Sub-step 2: Verification Code ---------------- */}
             {signUpStep === 'code' && (
               <View style={{ gap: 16 }}>
-                {/* Sandbox helper banner */}
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => setSignUpCode('000000')}
+                <View
                   style={{
                     padding: 12,
                     borderRadius: 12,
-                    backgroundColor: 'rgba(224, 107, 38, 0.12)',
+                    backgroundColor: isLight ? '#F1F5F9' : 'rgba(16, 185, 129, 0.08)',
                     borderWidth: 1,
-                    borderColor: 'rgba(224, 107, 38, 0.3)',
+                    borderColor: isLight ? '#E2E8F0' : 'rgba(16, 185, 129, 0.2)',
                     alignItems: 'center',
-                    gap: 4,
                   }}
                 >
-                  <Text style={{ color: '#E06B26', fontSize: 13, fontWeight: '700' }}>
-                    ⚡ Sandbox Mode Code: 000000
+                  <Text
+                    style={{
+                      color: isLight ? '#0F172A' : '#FFFFFF',
+                      fontSize: 13,
+                      fontWeight: '600',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Enter the 6-digit code sent to
                   </Text>
-                  <Text style={{ color: isLight ? '#64748B' : '#94A3B8', fontSize: 11 }}>
-                    Tap here to autofill and verify instantly
+                  <Text
+                    style={{
+                      color: '#10B981',
+                      fontSize: 13,
+                      fontWeight: '700',
+                      marginTop: 2,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {signUpEmail}
                   </Text>
-                </TouchableOpacity>
+                </View>
 
                 <TextInput
                   value={signUpCode}
@@ -970,7 +981,7 @@ export default function AuthScreen() {
                   }}
                   keyboardType="number-pad"
                   maxLength={6}
-                  placeholder="000000"
+                  placeholder="123456"
                   placeholderTextColor={isLight ? '#94A3B8' : '#64748B'}
                   autoFocus
                   style={[
@@ -1377,7 +1388,7 @@ export default function AuthScreen() {
                   onChangeText={setFallbackCode}
                   keyboardType="number-pad"
                   maxLength={6}
-                  placeholder="000000"
+                  placeholder="123456"
                   placeholderTextColor={isLight ? '#94A3B8' : '#64748B'}
                   autoFocus
                   style={[

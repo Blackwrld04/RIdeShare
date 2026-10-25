@@ -179,10 +179,7 @@ const environmentSchema = z
       .min(3)
       .max(20)
       .default(5),
-    OTP_DEV_CODE: z
-      .string()
-      .regex(/^\d{6}$/)
-      .optional(),
+    OTP_DEV_CODE: optionalString(z.string().regex(/^\d{6}$/)),
     NIN_PROVIDER: z.literal("ninja").default("ninja"),
     NINJA_BASE_URL: z
       .string()
@@ -413,11 +410,15 @@ const environmentSchema = z
       });
     }
 
-    if (config.SMS_PROVIDER === "console" && !config.OTP_DEV_CODE) {
+    if (
+      config.SMS_PROVIDER === "console" &&
+      !config.OTP_DEV_CODE &&
+      !(config.SMTP_USER && config.SMTP_PASS)
+    ) {
       context.addIssue({
         code: "custom",
         path: ["OTP_DEV_CODE"],
-        message: "OTP_DEV_CODE is required when SMS_PROVIDER is console",
+        message: "OTP_DEV_CODE is required when SMS_PROVIDER is console and SMTP is not configured",
       });
     }
 
