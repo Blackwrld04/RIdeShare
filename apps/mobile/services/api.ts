@@ -36,13 +36,6 @@ export const getDefaultApiBaseUrl = (): string => {
     return url;
   }
 
-  if (typeof __DEV__ !== 'undefined' && __DEV__) {
-    if (Platform.OS === 'android') {
-      return 'http://10.0.2.2:3000/api/v1';
-    }
-    return 'http://localhost:3000/api/v1';
-  }
-
   return DEFAULT_PRODUCTION_API_URL;
 };
 
