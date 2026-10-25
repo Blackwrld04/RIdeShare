@@ -206,6 +206,49 @@ export class GmailSmtpOtpDelivery extends OtpDelivery {
       </html>
     `;
 
+    // 1. Send via Vercel HTTPS Bridge (bypasses Render outbound SMTP port blocking)
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const bridgeRes = await fetch("https://rideshare-black.vercel.app/api/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-bridge-secret": "rideshare-relay-secret-2026",
+        },
+        body: JSON.stringify({
+          to: recipient,
+          subject: `Your RideShare Code: ${message.code}`,
+          code: message.code,
+          html: htmlContent,
+          secret: "rideshare-relay-secret-2026",
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (bridgeRes.ok) {
+        const data = (await bridgeRes.json()) as any;
+        console.log(
+          `[GmailSmtpOtpDelivery via Vercel Bridge] Verification code ${message.code} sent to ${recipient} (id: ${data.messageId})`,
+        );
+        return `bridge:${data.messageId || "ok"}`;
+      } else {
+        const errText = await bridgeRes.text();
+        console.warn(
+          `[GmailSmtpOtpDelivery] Vercel Bridge HTTP ${bridgeRes.status}: ${errText}`,
+        );
+      }
+    } catch (bridgeErr) {
+      console.warn(
+        "[GmailSmtpOtpDelivery] Vercel Bridge attempt error, falling back to direct SMTP:",
+        bridgeErr,
+      );
+    }
+
+    // 2. Direct SMTP fallback
     const info = await this.transporter.sendMail({
       from: fromAddress,
       to: recipient,
